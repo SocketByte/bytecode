@@ -542,7 +542,10 @@ func (m *MethodVisitor) AddInsn(insn int, args ...int) {
 	attr.Info = append(attr.Info, args...)
 
 	attr.ByteSize += 1 + len(args)
-	m.CodeSize.V2.V += 1 + len(args)
+
+	sizeInc := Int16ToBinary(attr.ByteSize)
+	m.CodeSize.V1 = U2{sizeInc[0]}
+	m.CodeSize.V2 = U2{sizeInc[1]}
 }
 
 func (m *MethodVisitor) End() {
