@@ -9,12 +9,11 @@ import (
 )
 
 func main() {
-	fmt.Println(fmt.Sprintf("%x", 29343))
+	fmt.Println(bytecode.DescriptorToStackSize("(II[Ljava/lang/String;Z)V"))
 
 	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
-	init.MaxStackLocals(1, 1)
-	init.AddInsn(bytecode.Aload0)
+	init.AddLoadInsn(bytecode.Aload0)
 	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object",
 		"<init>", "()V", false)
 	init.AddInsn(bytecode.Return)
@@ -22,7 +21,6 @@ func main() {
 
 	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
 		"main", "([Ljava/lang/String;)V")
-	method.MaxStackLocals(2, 1)
 	method.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
 	method.AddLdc(bytecode.TypeString, "Hello, World!")
 	method.AddMethodInsn(bytecode.Invokevirtual, "java/io/PrintStream",

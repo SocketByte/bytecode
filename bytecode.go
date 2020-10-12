@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 )
 
 /*
@@ -442,6 +443,10 @@ func (v *ClassVisitor) NewMethod(accessFlags int, name string, descriptor string
 	visitor.MethodName = U2{nameIndex}
 	visitor.MethodType = U2{descriptorIndex}
 	visitor.AttributeLength = U2{0x0001}
+	visitor.MaxLocals += DescriptorToStackSize(descriptor)[0]
+	if accessFlags&AccStatic != AccStatic {
+		visitor.MaxLocals++
+	}
 
 	codeAttr := AttributeInfo{}
 	codeAttr.AttributeNameIndex = U2{codeIndex}
@@ -462,14 +467,10 @@ type MethodVisitor struct {
 	AttributeLength U2
 	Attributes      []*AttributeInfo
 
-	MaxStack  U2
-	MaxLocals U2
+	Stack     int
+	MaxStack  int
+	MaxLocals int
 	CodeSize  U4
-}
-
-func (m *MethodVisitor) MaxStackLocals(maxStack int, maxLocals int) {
-	m.MaxStack = U2{maxStack}
-	m.MaxLocals = U2{maxLocals}
 }
 
 func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
@@ -485,22 +486,26 @@ func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
 		fallthrough
 	case TypeInt:
 		index = m.ParentVisitor.AddConstantPoolData(Integer, Int32ToBinary(object.(int))...)
-		break
-	case TypeDouble:
-		index = m.ParentVisitor.AddConstantPoolData(Double, Float64ToBinary(object.(float64))...)
+		m.AddStackInsn(Ldc, 1, index)
 		break
 	case TypeFloat:
 		index = m.ParentVisitor.AddConstantPoolData(Float, Float32ToBinary(object.(float32))...)
+		m.AddStackInsn(Ldc, 1, index)
+		break
+	case TypeDouble:
+		index = m.ParentVisitor.AddConstantPoolData(Double, Float64ToBinary(object.(float64))...)
+		m.AddStackInsn(Ldc2w, 1, index)
 		break
 	case TypeLong:
 		index = m.ParentVisitor.AddConstantPoolData(Long, Int64ToBinary(object.(int64))...)
+		m.AddStackInsn(Ldc2w, 1, index)
 		break
 	case TypeString:
 		index = m.ParentVisitor.AddConstantPoolDataNext(String)
 		m.ParentVisitor.AddUtf8Data(fmt.Sprintf("%v", object))
+		m.AddStackInsn(Ldc, 1, index)
 		break
 	}
-	m.AddInsn(Ldc, index)
 }
 
 func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor string, isInterface bool) {
@@ -509,10 +514,17 @@ func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor strin
 	} else {
 		m.addRefInsn(Methodref, insn, instance, name, descriptor)
 	}
+
+	m.MaxStack = m.Stack
+
+	stackSize := DescriptorToStackSize(descriptor)
+	m.Stack -= stackSize[0] // decrease by input stack size
+	m.Stack += stackSize[1] // increase by output stack size
 }
 
 func (m *MethodVisitor) AddFieldInsn(insn int, instance, name, descriptor string) {
 	m.addRefInsn(Fieldref, insn, instance, name, descriptor)
+	m.Stack += 1
 }
 
 func (m *MethodVisitor) addRefInsn(ref int, insn int, instance, name, descriptor string) {
@@ -536,6 +548,21 @@ func (m *MethodVisitor) addRefInsn(ref int, insn int, instance, name, descriptor
 	m.AddInsn(insn, mrIndexB[0], mrIndexB[1])
 }
 
+func (m *MethodVisitor) AddPushInsn(insn int, value ...int) {
+	m.AddStackInsn(insn, 1, value...)
+}
+
+func (m *MethodVisitor) AddVarInsn(insn int, value ...int) {
+	m.MaxStack = m.Stack
+	m.Stack = 0
+	m.AddInsn(insn, value...)
+	m.MaxLocals += 1
+}
+
+func (m *MethodVisitor) AddLoadInsn(insn int, value ...int) {
+	m.AddStackInsn(insn, 1, value...)
+}
+
 func (m *MethodVisitor) AddInsn(insn int, args ...int) {
 	attr := m.Attributes[0]
 	attr.Info = append(attr.Info, insn)
@@ -548,13 +575,34 @@ func (m *MethodVisitor) AddInsn(insn int, args ...int) {
 	m.CodeSize.V2 = U2{sizeInc[1]}
 }
 
+func (m *MethodVisitor) AddStackInsn(insn, stackChange int, args ...int) {
+	m.Stack += stackChange
+
+	attr := m.Attributes[0]
+	attr.Info = append(attr.Info, insn)
+	attr.Info = append(attr.Info, args...)
+
+	attr.ByteSize += 1 + len(args)
+
+	sizeInc := Int16ToBinary(attr.ByteSize)
+	m.CodeSize.V1 = U2{sizeInc[0]}
+	m.CodeSize.V2 = U2{sizeInc[1]}
+}
+
 func (m *MethodVisitor) End() {
+	m.EndManual(m.MaxStack, m.MaxLocals)
+}
+
+func (m *MethodVisitor) EndManual(maxStack, maxLocals int) {
 	attr := m.Attributes[0]
 	attr.AttributeLength = U4{U2{0x0000}, U2{attr.ByteSize + 12}}
 
+	maxStackBytes := Int16ToBinary(maxStack)
+	maxLocalsBytes := Int16ToBinary(maxLocals)
+
 	var attrInfo []int
-	attrInfo = append(attrInfo, m.MaxStack.Get()...)
-	attrInfo = append(attrInfo, m.MaxLocals.Get()...)
+	attrInfo = append(attrInfo, maxStackBytes[0], maxStackBytes[1])
+	attrInfo = append(attrInfo, maxLocalsBytes[0], maxLocalsBytes[1])
 
 	attrInfo = append(attrInfo, m.CodeSize.Get()...)
 
@@ -622,4 +670,39 @@ func BytesToInts(bytes []byte) []int {
 		ints[i] = int(b)
 	}
 	return ints
+}
+
+func DescriptorToStackSize(descriptor string) []int {
+	beginIndex := strings.LastIndex(descriptor, "(")
+	endIndex := strings.LastIndex(descriptor, ")")
+
+	sizes := make([]int, 2)
+	for i := beginIndex; i < endIndex; i++ {
+		char := []rune(descriptor)[i]
+
+		if char == '[' {
+			continue
+		}
+
+		if char == 'L' {
+			sizes[0] += 1
+
+			end := strings.Index(descriptor, ";")
+
+			i = end
+			if i > endIndex {
+				break
+			}
+			continue
+		}
+
+		sizes[0] += 1
+	}
+	sizes[0] -= 1
+	sub := strings.Split(descriptor, ")")[1]
+	if sub == "V" {
+		return sizes
+	}
+	sizes[1] = 1
+	return sizes
 }
