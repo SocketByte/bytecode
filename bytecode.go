@@ -349,11 +349,15 @@ func NewClass(version int, name string, accessFlags int) *ClassVisitor {
 	visitor.MajorVersion = U2{version}
 	visitor.ConstantPoolSize = U2{0x0001}
 
-	visitor.AddConstantPoolData(Class, 0x0000, 0x0002)
+	index := visitor.AddConstantPoolDataNext(Class)
 	visitor.AddUtf8Data(name)
 
-	visitor.ClassIndex = U2{0x0001}
-	visitor.SuperClassIndex = U2{0x0000}
+	visitor.ClassIndex = U2{index}
+
+	index = visitor.AddConstantPoolDataNext(Class)
+	visitor.AddUtf8Data("java/lang/Object")
+
+	visitor.SuperClassIndex = U2{index}
 	visitor.AccessFlags = U2{accessFlags}
 
 	return &visitor
@@ -362,7 +366,7 @@ func NewClass(version int, name string, accessFlags int) *ClassVisitor {
 func (v *ClassVisitor) AddUtf8Data(text string) int {
 	var bytes []int
 	ints := StringToInts(text)
-	length := Int8ToBinary(len(text))
+	length := Int16ToBinary(len(text))
 	bytes = append(bytes, length[0], length[1])
 	bytes = append(bytes, ints...)
 	return v.AddConstantPoolData(Utf8, bytes...)
@@ -423,7 +427,7 @@ func (v *ClassVisitor) AddConstantPoolData(tag int, args ...int) int {
 }
 
 func (v *ClassVisitor) AddConstantPoolDataNext(tag int) int {
-	index := Int8ToBinary(v.NextConstantIndex())
+	index := Int16ToBinary(v.NextConstantIndex())
 	return v.AddConstantPoolData(tag, index[0], index[1])
 }
 
@@ -499,24 +503,36 @@ func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
 	m.AddInsn(Ldc, index)
 }
 
-func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor string) {
+func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor string, isInterface bool) {
+	if isInterface {
+		m.addRefInsn(InterfaceMethodref, insn, instance, name, descriptor)
+	} else {
+		m.addRefInsn(Methodref, insn, instance, name, descriptor)
+	}
+}
+
+func (m *MethodVisitor) AddFieldInsn(insn int, instance, name, descriptor string) {
+	m.addRefInsn(Fieldref, insn, instance, name, descriptor)
+}
+
+func (m *MethodVisitor) addRefInsn(ref int, insn int, instance, name, descriptor string) {
 	iIndex := m.ParentVisitor.AddConstantPoolDataNext(Class)
 	m.ParentVisitor.AddUtf8Data(instance)
 
 	nIndex := m.ParentVisitor.AddUtf8Data(name)
 	dIndex := m.ParentVisitor.AddUtf8Data(descriptor)
 
-	nIndexB := Int8ToBinary(nIndex)
-	dIndexB := Int8ToBinary(dIndex)
+	nIndexB := Int16ToBinary(nIndex)
+	dIndexB := Int16ToBinary(dIndex)
 	ntIndex := m.ParentVisitor.AddConstantPoolData(NameAndType,
 		nIndexB[0], nIndexB[1], dIndexB[0], dIndexB[1])
 
-	ntIndexB := Int8ToBinary(ntIndex)
-	iIndexB := Int8ToBinary(iIndex)
-	mrIndex := m.ParentVisitor.AddConstantPoolData(Methodref,
+	ntIndexB := Int16ToBinary(ntIndex)
+	iIndexB := Int16ToBinary(iIndex)
+	mrIndex := m.ParentVisitor.AddConstantPoolData(ref,
 		iIndexB[0], iIndexB[1], ntIndexB[0], ntIndexB[1])
 
-	mrIndexB := Int8ToBinary(mrIndex)
+	mrIndexB := Int16ToBinary(mrIndex)
 	m.AddInsn(insn, mrIndexB[0], mrIndexB[1])
 }
 
@@ -575,7 +591,7 @@ func Float64ToBinary(value float64) []int {
 	return BytesToInts(bytes)
 }
 
-func Int8ToBinary(value int) []int {
+func Int16ToBinary(value int) []int {
 	bytes := make([]byte, 2)
 	bytes[1] = (byte)(value & 0xFF)
 	bytes[0] = (byte)((value >> 8) & 0xFF)

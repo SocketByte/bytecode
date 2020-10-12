@@ -13,17 +13,24 @@ func main() {
 
 	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
+	init.MaxStackLocals(1, 1)
 	init.AddInsn(bytecode.Aload0)
-	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object", "<init>", "()V")
+	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object",
+		"<init>", "()V", false)
+	init.AddInsn(bytecode.Return)
 	init.End()
 
-	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic, "main", "([Ljava/lang/String;)V")
-	method.MaxStackLocals(1, 1)
-	method.AddLdc(bytecode.TypeString, "siema")
-	method.AddInsn(bytecode.Astore1)
+	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
+		"main", "([Ljava/lang/String;)V")
+	method.MaxStackLocals(2, 1)
+	method.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
+	method.AddLdc(bytecode.TypeString, "Hello, World!")
+	method.AddMethodInsn(bytecode.Invokevirtual, "java/io/PrintStream",
+		"println", "(Ljava/lang/String;)V", false)
+	method.AddInsn(bytecode.Return)
 	method.End()
 
-	RunJavap(visitor.AsBytecode(), "build/hello.class")
+	RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }
 
 func RunJavap(bytecode []byte, path string) {
