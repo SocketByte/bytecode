@@ -1,5 +1,11 @@
 package bytecode
 
+import (
+	"encoding/binary"
+	"fmt"
+	"math"
+)
+
 /*
 Default Java major versions
 Currently there's no stack frame calculation, therefore Java5 should be used at default.
@@ -268,225 +274,318 @@ const Tableswitch = 0xaa
 const Wide = 0xc4
 
 /*
+Java types
+*/
+const TypeInt = 0
+const TypeByte = 1
+const TypeShort = 2
+const TypeDouble = 3
+const TypeLong = 4
+const TypeString = 5
+const TypeObject = 6
+const TypeBoolean = 7
+const TypeFloat = 8
+const TypeChar = 9
+
+/*
 Bytecode types
 */
 type U1 struct {
-    V int
+	V int
 }
 
 func (u *U1) Get() int {
-    return u.V
+	return u.V
 }
 
 type U2 struct {
-    V int
+	V int
 }
 
 func (u *U2) Get() []int {
-    buf := make([]int, 2)
-    buf[1] = u.V & 0xff
-    buf[0] = u.V >> 8
-    return buf
+	buf := make([]int, 2)
+	buf[1] = u.V & 0xff
+	buf[0] = u.V >> 8
+	return buf
 }
 
 type U4 struct {
-    V1 U2
-    V2 U2
+	V1 U2
+	V2 U2
 }
 
 func (u *U4) Get() []int {
-    return append(u.V1.Get(), u.V2.Get()...)
+	return append(u.V1.Get(), u.V2.Get()...)
 }
 
 type ConstantPoolData struct {
-    Tag int
-    Info []int
+	Tag  int
+	Info []int
 }
 
 type ClassVisitor struct {
-    MagicNumber U4
-    MinorVersion U2
-    MajorVersion U2
-    ConstantPoolSize U2
-    ConstantPool []ConstantPoolData
-    AccessFlags U2
-    ClassIndex U2
-    SuperClassIndex U2
-    InterfaceLength U2
-    // interfaces
-    FieldLength U2
-    // fields
-    MethodLength U2
-    Methods []*MethodVisitor
-    AttributeLength U2
-    // attributes
+	MagicNumber      U4
+	MinorVersion     U2
+	MajorVersion     U2
+	ConstantPoolSize U2
+	ConstantPool     []ConstantPoolData
+	AccessFlags      U2
+	ClassIndex       U2
+	SuperClassIndex  U2
+	InterfaceLength  U2
+	// interfaces
+	FieldLength U2
+	// fields
+	MethodLength    U2
+	Methods         []*MethodVisitor
+	AttributeLength U2
+	// attributes
 }
 
 func NewClass(version int, name string, accessFlags int) *ClassVisitor {
-    visitor := ClassVisitor{}
-    visitor.MagicNumber = U4{U2{0xcafe}, U2{0xbabe}}
-    visitor.MinorVersion = U2{0x0000}
-    visitor.MajorVersion = U2{version}
-    visitor.ConstantPoolSize = U2{0x0001}
+	visitor := ClassVisitor{}
+	visitor.MagicNumber = U4{U2{0xcafe}, U2{0xbabe}}
+	visitor.MinorVersion = U2{0x0000}
+	visitor.MajorVersion = U2{version}
+	visitor.ConstantPoolSize = U2{0x0001}
 
-    visitor.AddConstantPoolData(Class, 0x0000, 0x0002)
-    visitor.AddUtf8Data(name)
+	visitor.AddConstantPoolData(Class, 0x0000, 0x0002)
+	visitor.AddUtf8Data(name)
 
-    visitor.ClassIndex = U2{0x0001}
-    visitor.SuperClassIndex = U2{0x0000}
-    visitor.AccessFlags = U2{accessFlags}
+	visitor.ClassIndex = U2{0x0001}
+	visitor.SuperClassIndex = U2{0x0000}
+	visitor.AccessFlags = U2{accessFlags}
 
-    return &visitor
+	return &visitor
 }
 
 func (v *ClassVisitor) AddUtf8Data(text string) int {
-    var bytes []int
-    ints := StringToInts(text)
-    bytes = append(bytes, 0x00, len(text))
-    bytes = append(bytes, ints...)
-    return v.AddConstantPoolData(Utf8, bytes...)
+	var bytes []int
+	ints := StringToInts(text)
+	bytes = append(bytes, 0x00, len(text))
+	bytes = append(bytes, ints...)
+	return v.AddConstantPoolData(Utf8, bytes...)
 }
 
 func (v *ClassVisitor) AsBytecode() []byte {
-    var buf []int
-    buf = append(buf, v.MagicNumber.Get()...)
-    buf = append(buf, v.MinorVersion.Get()...)
-    buf = append(buf, v.MajorVersion.Get()...)
-    buf = append(buf, v.ConstantPoolSize.Get()...)
+	var buf []int
+	buf = append(buf, v.MagicNumber.Get()...)
+	buf = append(buf, v.MinorVersion.Get()...)
+	buf = append(buf, v.MajorVersion.Get()...)
+	buf = append(buf, v.ConstantPoolSize.Get()...)
 
-    for _, pool := range v.ConstantPool {
-        buf = append(buf, pool.Tag)
-        buf = append(buf, pool.Info...)
-    }
+	for _, pool := range v.ConstantPool {
+		buf = append(buf, pool.Tag)
+		buf = append(buf, pool.Info...)
+	}
 
-    buf = append(buf, v.AccessFlags.Get()...)
-    buf = append(buf, v.ClassIndex.Get()...)
-    buf = append(buf, v.SuperClassIndex.Get()...)
+	buf = append(buf, v.AccessFlags.Get()...)
+	buf = append(buf, v.ClassIndex.Get()...)
+	buf = append(buf, v.SuperClassIndex.Get()...)
 
-    buf = append(buf, v.InterfaceLength.Get()...)
-    buf = append(buf, v.FieldLength.Get()...)
+	buf = append(buf, v.InterfaceLength.Get()...)
+	buf = append(buf, v.FieldLength.Get()...)
 
-    buf = append(buf, v.MethodLength.Get()...)
-    for _, method := range v.Methods {
-        buf = append(buf, method.AccessFlags.Get()...)
-        buf = append(buf, method.MethodName.Get()...)
-        buf = append(buf, method.MethodType.Get()...)
-        buf = append(buf, method.AttributeLength.Get()...)
+	buf = append(buf, v.MethodLength.Get()...)
+	for _, method := range v.Methods {
+		buf = append(buf, method.AccessFlags.Get()...)
+		buf = append(buf, method.MethodName.Get()...)
+		buf = append(buf, method.MethodType.Get()...)
+		buf = append(buf, method.AttributeLength.Get()...)
 
-        for _, attr := range method.Attributes {
-            buf = append(buf, attr.AttributeNameIndex.Get()...)
-            buf = append(buf, attr.AttributeLength.Get()...)
-            for _, info := range attr.Info {
-                buf = append(buf, info)
-            }
-        }
-    }
+		for _, attr := range method.Attributes {
+			buf = append(buf, attr.AttributeNameIndex.Get()...)
+			buf = append(buf, attr.AttributeLength.Get()...)
+			for _, info := range attr.Info {
+				buf = append(buf, info)
+			}
+		}
+	}
 
-    buf = append(buf, v.AttributeLength.Get()...)
+	buf = append(buf, v.AttributeLength.Get()...)
 
-    bytes := make([]byte, len(buf))
-    for i, b := range buf {
-        bytes[i] = byte(b)
-    }
-    return bytes
+	bytes := make([]byte, len(buf))
+	for i, b := range buf {
+		bytes[i] = byte(b)
+	}
+	return bytes
 }
 
 func (v *ClassVisitor) NextConstantIndex() int {
-    return v.ConstantPoolSize.V + 1
+	return v.ConstantPoolSize.V + 1
 }
 
 func (v *ClassVisitor) AddConstantPoolData(tag int, args ...int) int {
-    v.ConstantPool = append(v.ConstantPool, ConstantPoolData{tag, args})
-    v.ConstantPoolSize.V += 1
-    return v.ConstantPoolSize.V - 1
+	v.ConstantPool = append(v.ConstantPool, ConstantPoolData{tag, args})
+	v.ConstantPoolSize.V += 1
+	return v.ConstantPoolSize.V - 1
+}
+
+func (v *ClassVisitor) AddConstantPoolDataNext(tag int) int {
+	return v.AddConstantPoolData(tag, 0x0000, v.NextConstantIndex())
 }
 
 func (v *ClassVisitor) NewMethod(accessFlags int, name string, descriptor string) *MethodVisitor {
-    nameIndex := v.AddUtf8Data(name)
-    descriptorIndex := v.AddUtf8Data(descriptor)
-    codeIndex := v.AddUtf8Data("Code")
+	nameIndex := v.AddUtf8Data(name)
+	descriptorIndex := v.AddUtf8Data(descriptor)
+	codeIndex := v.AddUtf8Data("Code")
 
-    visitor := MethodVisitor{}
-    visitor.ParentVisitor = v
-    visitor.AccessFlags = U2{accessFlags}
-    visitor.MethodName = U2{nameIndex}
-    visitor.MethodType = U2{descriptorIndex}
-    visitor.AttributeLength = U2{0x0001}
+	visitor := MethodVisitor{}
+	visitor.ParentVisitor = v
+	visitor.AccessFlags = U2{accessFlags}
+	visitor.MethodName = U2{nameIndex}
+	visitor.MethodType = U2{descriptorIndex}
+	visitor.AttributeLength = U2{0x0001}
 
-    codeAttr := AttributeInfo{}
-    codeAttr.AttributeNameIndex = U2{codeIndex}
+	codeAttr := AttributeInfo{}
+	codeAttr.AttributeNameIndex = U2{codeIndex}
 
-    visitor.Attributes = append(visitor.Attributes, &codeAttr)
+	visitor.Attributes = append(visitor.Attributes, &codeAttr)
 
-    v.MethodLength.V += 1
-    v.Methods = append(v.Methods, &visitor)
-    return &visitor
+	v.MethodLength.V += 1
+	v.Methods = append(v.Methods, &visitor)
+	return &visitor
 }
 
 type MethodVisitor struct {
-    ParentVisitor *ClassVisitor
+	ParentVisitor *ClassVisitor
 
-    AccessFlags U2
-    MethodName U2
-    MethodType U2
-    AttributeLength U2
-    Attributes []*AttributeInfo
+	AccessFlags     U2
+	MethodName      U2
+	MethodType      U2
+	AttributeLength U2
+	Attributes      []*AttributeInfo
 
-    MaxStack U2
-    MaxLocals U2
-    CodeSize U4
+	MaxStack  U2
+	MaxLocals U2
+	CodeSize  U4
 }
 
 func (m *MethodVisitor) MaxStackLocals(maxStack int, maxLocals int) {
-    m.MaxStack = U2{maxStack}
-    m.MaxLocals = U2{maxLocals}
+	m.MaxStack = U2{maxStack}
+	m.MaxLocals = U2{maxLocals}
 }
 
-func (m *MethodVisitor) PushText(text string) {
-    strIndex := m.ParentVisitor.AddConstantPoolData(String,
-        0x0000, m.ParentVisitor.NextConstantIndex())
-    m.ParentVisitor.AddUtf8Data(text)
-    m.AddInsn(Ldc, strIndex)
+func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
+	var index int
+	switch javaType {
+	case TypeChar:
+		fallthrough
+	case TypeByte:
+		fallthrough
+	case TypeShort:
+		fallthrough
+	case TypeBoolean:
+		fallthrough
+	case TypeInt:
+		index = m.ParentVisitor.AddConstantPoolData(Integer, Int32ToBinary(object.(int))...)
+		break
+	case TypeDouble:
+		index = m.ParentVisitor.AddConstantPoolData(Double, Float64ToBinary(object.(float64))...)
+		break
+	case TypeFloat:
+		index = m.ParentVisitor.AddConstantPoolData(Float, Float32ToBinary(object.(float32))...)
+		break
+	case TypeLong:
+		index = m.ParentVisitor.AddConstantPoolData(Long, Int64ToBinary(object.(int64))...)
+		break
+	case TypeString:
+		index = m.ParentVisitor.AddConstantPoolDataNext(String)
+		m.ParentVisitor.AddUtf8Data(fmt.Sprintf("%v", object))
+		break
+	}
+	m.AddInsn(Ldc, index)
+}
+
+func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor string) {
+	iIndex := m.ParentVisitor.AddConstantPoolDataNext(Class)
+	m.ParentVisitor.AddUtf8Data(instance)
+
+	nIndex := m.ParentVisitor.AddUtf8Data(name)
+	dIndex := m.ParentVisitor.AddUtf8Data(descriptor)
+
+	ntIndex := m.ParentVisitor.AddConstantPoolData(NameAndType,
+		0x0000, nIndex, 0x0000, dIndex)
+
+	mrIndex := m.ParentVisitor.AddConstantPoolData(Methodref,
+		0x0000, iIndex, 0x0000, ntIndex)
+
+	m.AddInsn(insn, 0x0000, mrIndex)
 }
 
 func (m *MethodVisitor) AddInsn(insn int, args ...int) {
-    attr := m.Attributes[0]
-    attr.Info = append(attr.Info, insn)
-    attr.Info = append(attr.Info, args...)
+	attr := m.Attributes[0]
+	attr.Info = append(attr.Info, insn)
+	attr.Info = append(attr.Info, args...)
 
-    attr.ByteSize += 1 + len(args)
-    m.CodeSize.V2.V += 1 + len(args)
+	attr.ByteSize += 1 + len(args)
+	m.CodeSize.V2.V += 1 + len(args)
 }
 
 func (m *MethodVisitor) End() {
-    attr := m.Attributes[0]
-    attr.AttributeLength = U4{U2{0x0000}, U2{attr.ByteSize + 12}}
+	attr := m.Attributes[0]
+	attr.AttributeLength = U4{U2{0x0000}, U2{attr.ByteSize + 12}}
 
-    var attrInfo []int
-    attrInfo = append(attrInfo, m.MaxStack.Get()...)
-    attrInfo = append(attrInfo, m.MaxLocals.Get()...)
+	var attrInfo []int
+	attrInfo = append(attrInfo, m.MaxStack.Get()...)
+	attrInfo = append(attrInfo, m.MaxLocals.Get()...)
 
-    attrInfo = append(attrInfo, m.CodeSize.Get()...)
+	attrInfo = append(attrInfo, m.CodeSize.Get()...)
 
-    attrInfo = append(attrInfo, attr.Info...)
-    attrInfo = append(attrInfo, 0, 0, 0, 0)
+	attrInfo = append(attrInfo, attr.Info...)
+	attrInfo = append(attrInfo, 0, 0, 0, 0)
 
-    attr.Info = attrInfo
+	attr.Info = attrInfo
 }
 
 type AttributeInfo struct {
-    AttributeNameIndex U2
-    AttributeLength U4
-    Info []int
+	AttributeNameIndex U2
+	AttributeLength    U4
+	Info               []int
 
-    ByteSize int
+	ByteSize int
 }
 
 func StringToInts(text string) []int {
-    bytes := []byte(text)
-    ints := make([]int, len(bytes))
-    for i, b := range bytes {
-        ints[i] = int(b)
-    }
-    return ints
+	bytes := []byte(text)
+
+	return BytesToInts(bytes)
+}
+
+func Float32ToBinary(value float32) []int {
+	bytes := make([]byte, 4)
+	bits := math.Float32bits(value)
+	binary.BigEndian.PutUint32(bytes, bits)
+
+	return BytesToInts(bytes)
+}
+
+func Float64ToBinary(value float64) []int {
+	bytes := make([]byte, 8)
+	bits := math.Float64bits(value)
+	binary.BigEndian.PutUint64(bytes, bits)
+
+	return BytesToInts(bytes)
+}
+
+func Int32ToBinary(value int) []int {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, uint32(value))
+
+	return BytesToInts(bytes)
+}
+
+func Int64ToBinary(value int64) []int {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint64(bytes, uint64(value))
+
+	return BytesToInts(bytes)
+}
+
+func BytesToInts(bytes []byte) []int {
+	ints := make([]int, len(bytes))
+	for i, b := range bytes {
+		ints[i] = int(b)
+	}
+	return ints
 }

@@ -9,21 +9,18 @@ import (
 )
 
 func main() {
-	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
-	method := visitor.NewMethod(bytecode.AccPublic, "main", "([Ljava/lang/String;)V")
-	method.MaxStackLocals(1, 1)
-	method.PushText("Hello, World!")
-	method.AddInsn(bytecode.Astore1)
-	method.AddInsn(bytecode.Bipush, 120)
-	method.AddInsn(bytecode.Istore2)
-	method.End()
+	fmt.Println(fmt.Sprintf("%x", 29343))
 
-	method = visitor.NewMethod(bytecode.AccStatic|bytecode.AccPublic, "add", "(II)I")
-	method.MaxStackLocals(1, 2)
-	method.AddInsn(bytecode.Iload1)
-	method.AddInsn(bytecode.Iload2)
-	method.AddInsn(bytecode.Iadd)
-	method.AddInsn(bytecode.Ireturn)
+	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
+	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
+	init.AddInsn(bytecode.Aload0)
+	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object", "<init>", "()V")
+	init.End()
+
+	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic, "main", "([Ljava/lang/String;)V")
+	method.MaxStackLocals(1, 1)
+	method.AddLdc(bytecode.TypeString, "siema")
+	method.AddInsn(bytecode.Astore1)
 	method.End()
 
 	RunJavap(visitor.AsBytecode(), "build/hello.class")
