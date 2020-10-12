@@ -362,7 +362,8 @@ func NewClass(version int, name string, accessFlags int) *ClassVisitor {
 func (v *ClassVisitor) AddUtf8Data(text string) int {
 	var bytes []int
 	ints := StringToInts(text)
-	bytes = append(bytes, 0x00, len(text))
+	length := Int8ToBinary(len(text))
+	bytes = append(bytes, length[0], length[1])
 	bytes = append(bytes, ints...)
 	return v.AddConstantPoolData(Utf8, bytes...)
 }
@@ -422,7 +423,8 @@ func (v *ClassVisitor) AddConstantPoolData(tag int, args ...int) int {
 }
 
 func (v *ClassVisitor) AddConstantPoolDataNext(tag int) int {
-	return v.AddConstantPoolData(tag, 0x0000, v.NextConstantIndex())
+	index := Int8ToBinary(v.NextConstantIndex())
+	return v.AddConstantPoolData(tag, index[0], index[1])
 }
 
 func (v *ClassVisitor) NewMethod(accessFlags int, name string, descriptor string) *MethodVisitor {
@@ -504,13 +506,18 @@ func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor strin
 	nIndex := m.ParentVisitor.AddUtf8Data(name)
 	dIndex := m.ParentVisitor.AddUtf8Data(descriptor)
 
+	nIndexB := Int8ToBinary(nIndex)
+	dIndexB := Int8ToBinary(dIndex)
 	ntIndex := m.ParentVisitor.AddConstantPoolData(NameAndType,
-		0x0000, nIndex, 0x0000, dIndex)
+		nIndexB[0], nIndexB[1], dIndexB[0], dIndexB[1])
 
+	ntIndexB := Int8ToBinary(ntIndex)
+	iIndexB := Int8ToBinary(iIndex)
 	mrIndex := m.ParentVisitor.AddConstantPoolData(Methodref,
-		0x0000, iIndex, 0x0000, ntIndex)
+		iIndexB[0], iIndexB[1], ntIndexB[0], ntIndexB[1])
 
-	m.AddInsn(insn, 0x0000, mrIndex)
+	mrIndexB := Int8ToBinary(mrIndex)
+	m.AddInsn(insn, mrIndexB[0], mrIndexB[1])
 }
 
 func (m *MethodVisitor) AddInsn(insn int, args ...int) {
@@ -564,6 +571,14 @@ func Float64ToBinary(value float64) []int {
 	bytes := make([]byte, 8)
 	bits := math.Float64bits(value)
 	binary.BigEndian.PutUint64(bytes, bits)
+
+	return BytesToInts(bytes)
+}
+
+func Int8ToBinary(value int) []int {
+	bytes := make([]byte, 2)
+	bytes[1] = (byte)(value & 0xFF)
+	bytes[0] = (byte)((value >> 8) & 0xFF)
 
 	return BytesToInts(bytes)
 }
