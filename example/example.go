@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	fmt.Println(bytecode.DescriptorToStackSize("(II[Ljava/lang/String;Z)V"))
-
 	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
 	init.AddInsn(bytecode.Aload0)
@@ -27,14 +25,6 @@ func main() {
 		"println", "(Ljava/lang/String;)V", false)
 	method.AddInsn(bytecode.Return)
 	method.End(2)
-
-	add := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic,
-		"add", "(II)I")
-	add.AddInsn(bytecode.Iload1)
-	add.AddInsn(bytecode.Iload2)
-	add.AddInsn(bytecode.Iadd)
-	add.AddInsn(bytecode.Ireturn)
-	add.End(2)
 
 	RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }
