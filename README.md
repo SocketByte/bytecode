@@ -1,6 +1,15 @@
 # Bytecode
 Very simple bytecode generation library for Go
 
+## Features
+- Creating Java classes and methods
+- Automatic stack depth calculation
+- Automatic locals calculation
+- Efficient generation
+- Low-level access
+- Simple and self-documented codebase
+- Constant pool caching
+
 ## Basic example
 ```go
 package main
