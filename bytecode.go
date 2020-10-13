@@ -1,479 +1,258 @@
 package bytecode
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math"
-	"strings"
 )
 
-/*
-Default Java major versions
-Currently there's no stack frame calculation, therefore Java5 should be used at default.
-*/
-const Java5 = 49
-const Java6 = 50
-const Java7 = 51
-const Java8 = 52
-const Java9 = 53
-const Java10 = 54
-const Java11 = 55
-const Java12 = 56
-const Java13 = 57
-const Java14 = 58
-const Java15 = 59
-
-/*
-Access modifiers
-*/
-const AccPublic = 0x0001
-const AccFinal = 0x0010
-const AccSuper = 0x0020
-const AccInterface = 0x0200
-const AccAbstract = 0x0400
-const AccSynthetic = 0x1000
-const AccAnnotation = 0x2000
-const AccEnum = 0x4000
-
-const AccPrivate = 0x0002
-const AccProtected = 0x0004
-const AccStatic = 0x0008
-const AccVolatile = 0x0040
-const AccTransient = 0x0080
-
-const AccSynchronized = 0x0020
-const AccBridge = 0x0040
-const AccVarargs = 0x0080
-const AccNative = 0x0100
-const AccStrict = 0x0800
-
-/*
-Constant pool tags
-*/
-const Class = 7
-const Fieldref = 9
-const Methodref = 10
-const InterfaceMethodref = 11
-const String = 8
-const Integer = 3
-const Float = 4
-const Long = 5
-const Double = 6
-const NameAndType = 12
-const Utf8 = 1
-const MethodHandle = 15
-const MethodType = 16
-const InvokeDynamic = 18 // Java 7+ only
-
-/*
-Instructions
-*/
-const Aaload = 0x32
-const Aastore = 0x53
-const AconstNull = 0x01
-const Aload = 0x19
-const Aload0 = 0x2a
-const Aload1 = 0x2b
-const Aload2 = 0x2c
-const Aload3 = 0x2d
-const Anewarray = 0xbd
-const Areturn = 0xb0
-const Arraylength = 0xbe
-const Astore = 0x3a
-const Astore0 = 0x4b
-const Astore1 = 0x4c
-const Astore2 = 0x4d
-const Astore3 = 0x4e
-const Athrow = 0xbf
-const Baload = 0x33
-const Bastore = 0x54
-const Bipush = 0x10
-const Breakpoint = 0xca
-const Caload = 0x34
-const Castore = 0x55
-const Checkcast = 0xc0
-const D2f = 0x90
-const D2i = 0x8e
-const D2l = 0x8f
-const Dadd = 0x64
-const Daload = 0x31
-const Dastore = 0x52
-const Dcmpg = 0x98
-const Dcmpl = 0x97
-const Dconst0 = 0x0e
-const Dconst1 = 0x0f
-const Ddiv = 0x6f
-const Dload = 0x18
-const Dload0 = 0x26
-const Dload1 = 0x27
-const Dload2 = 0x28
-const Dload3 = 0x29
-const Dmul = 0x6b
-const Dneg = 0x77
-const Drem = 0x73
-const Dreturn = 0xaf
-const Dstore = 0x39
-const Dstore0 = 0x47
-const Dstore1 = 0x48
-const Dstore2 = 0x49
-const Dstore3 = 0x4a
-const Dsub = 0x67
-const Dup = 0x59
-const Dupx1 = 0x5a
-const Dupx2 = 0x5b
-const Dup2 = 0x5c
-const Dup2x1 = 0x5d
-const Dup2x2 = 0x5e
-const F2d = 0x8d
-const F2i = 0x8b
-const F2l = 0x8c
-const Fadd = 0x62
-const Faload = 0x30
-const Fastore = 0x51
-const Fcmpg = 0x96
-const Fcmpl = 0x95
-const Fconst0 = 0x0b
-const Fconst1 = 0x0c
-const Fconst2 = 0x0d
-const Fdiv = 0x6e
-const Fload = 0x17
-const Fload0 = 0x22
-const Fload1 = 0x23
-const Fload2 = 0x24
-const Fload3 = 0x25
-const Fmul = 0x6a
-const Fneg = 0x76
-const Frem = 0x72
-const Freturn = 0xae
-const Fstore = 0x38
-const Fstore0 = 0x43
-const Fstore1 = 0x44
-const Fstore2 = 0x45
-const Fstore3 = 0x46
-const Fsub = 0x66
-const Getfield = 0xb4
-const Getstatic = 0xb2
-const Goto = 0xa7
-const Gotow = 0xc8
-const I2b = 0x91
-const I2c = 0x92
-const I2d = 0x87
-const I2f = 0x86
-const I2l = 0x85
-const I2s = 0x93
-const Iadd = 0x60
-const Iaload = 0x2e
-const Iand = 0x7e
-const Iastore = 0x4f
-const Iconstm1 = 0x02
-const Iconst0 = 0x03
-const Iconst1 = 0x04
-const Iconst2 = 0x05
-const Iconst3 = 0x06
-const Iconst4 = 0x07
-const Iconst5 = 0x08
-const Idiv = 0x6c
-const Ifacmpeq = 0xa5
-const Ifacmpne = 0xa6
-const Ificmpeq = 0x9f
-const Ificmpge = 0xa2
-const Ificmpgt = 0xa3
-const Ificmple = 0xa4
-const Ificmplt = 0xa1
-const Ificmpne = 0xa0
-const Ifeq = 0x99
-const Ifge = 0x9c
-const Ifgt = 0x9d
-const Ifle = 0x9e
-const Iflt = 0x9b
-const Ifne = 0x9a
-const Ifnonnull = 0xc7
-const Ifnull = 0xc6
-const Iinc = 0x84
-const Iload = 0x15
-const Iload0 = 0x1a
-const Iload1 = 0x1b
-const Iload2 = 0x1c
-const Iload3 = 0x1d
-const Impdep1 = 0xfe
-const Impdep2 = 0xff
-const Imul = 0x68
-const Ineg = 0x74
-const Instanceof = 0xc1
-const Invokedynamic = 0xba
-const Invokeinterface = 0xb9
-const Invokespecial = 0xb7
-const Invokestatic = 0xb8
-const Invokevirtual = 0xb6
-const Ior = 0x80
-const Irem = 0x70
-const Ireturn = 0xac
-const Ishl = 0x78
-const Ishr = 0x7a
-const Istore = 0x36
-const Istore0 = 0x3b
-const Istore1 = 0x3c
-const Istore2 = 0x3d
-const Istore3 = 0x3e
-const Isub = 0x64
-const Iushr = 0x7c
-const Ixor = 0x82
-const Jsr = 0xa8
-const Jsrw = 0xc9
-const L2d = 0x8a
-const L2f = 0x89
-const L2i = 0x88
-const Ladd = 0x61
-const Laload = 0x2f
-const Land = 0x7f
-const Lastore = 0x50
-const Lcmp = 0x94
-const Lconst0 = 0x09
-const Lconst1 = 0x0a
-const Ldc = 0x12
-const Ldcw = 0x13
-const Ldc2w = 0x14
-const Ldiv = 0x6d
-const Lload = 0x16
-const Lload0 = 0x1e
-const Lload1 = 0x1f
-const Lload2 = 0x20
-const Lload3 = 0x21
-const Lmul = 0x69
-const Lneg = 0x75
-const Lookupswitch = 0xab
-const Lor = 0x81
-const Lrem = 0x71
-const Lreturn = 0xad
-const Lshl = 0x79
-const Lshr = 0x7b
-const Lstore = 0x37
-const Lstore0 = 0x3f
-const Lstore1 = 0x40
-const Lstore2 = 0x41
-const Lstore3 = 0x42
-const Lsub = 0x65
-const Lushr = 0x7d
-const Lxor = 0x83
-const Monitorenter = 0xc2
-const Monitorexit = 0xc3
-const Multianewarray = 0xc5
-const New = 0xbb
-const Newarray = 0xbc
-const Nop = 0x00
-const Pop = 0x57
-const Pop2 = 0x58
-const Putfield = 0xb5
-const Putstatic = 0xb3
-const Ret = 0xa9
-const Return = 0xb1
-const Saload = 0x35
-const Sastore = 0x56
-const Sipush = 0x11
-const Swap = 0x5f
-const Tableswitch = 0xaa
-const Wide = 0xc4
-
-/*
-Java types
-*/
-const TypeInt = 0
-const TypeByte = 1
-const TypeShort = 2
-const TypeDouble = 3
-const TypeLong = 4
-const TypeString = 5
-const TypeObject = 6
-const TypeBoolean = 7
-const TypeFloat = 8
-const TypeChar = 9
-
-/*
-Bytecode types
-*/
-type U1 struct {
-	V int
+type Buffer struct {
+	buffer []byte
 }
 
-func (u *U1) Get() int {
-	return u.V
+func (b *Buffer) PushBytes(bytes ...byte) {
+	b.buffer = append(b.buffer, bytes...)
 }
 
-type U2 struct {
-	V int
+func (b *Buffer) PushUInt16(values ...uint16) {
+	for _, value := range values {
+		b.buffer = append(b.buffer, Int16ToBinary(value)...)
+	}
 }
 
-func (u *U2) Get() []int {
-	buf := make([]int, 2)
-	buf[1] = u.V & 0xff
-	buf[0] = u.V >> 8
-	return buf
+func (b *Buffer) PushUInt32(values ...uint32) {
+	for _, value := range values {
+		b.buffer = append(b.buffer, Int32ToBinary(value)...)
+	}
 }
 
-type U4 struct {
-	V1 U2
-	V2 U2
+func (b *Buffer) PushUInt64(values ...uint64) {
+	for _, value := range values {
+		b.buffer = append(b.buffer, Int64ToBinary(value)...)
+	}
 }
 
-func (u *U4) Get() []int {
-	return append(u.V1.Get(), u.V2.Get()...)
+func (b *Buffer) PushFloat32(values ...float32) {
+	for _, value := range values {
+		b.buffer = append(b.buffer, Float32ToBinary(value)...)
+	}
 }
 
-type ConstantPoolData struct {
-	Tag  int
-	Info []int
+func (b *Buffer) PushFloat64(values ...float64) {
+	for _, value := range values {
+		b.buffer = append(b.buffer, Float64ToBinary(value)...)
+	}
+}
+
+func (b *Buffer) Get() []byte {
+	return b.buffer
+}
+
+type Constant struct {
+	Tag  byte
+	Info []byte
 }
 
 type ClassVisitor struct {
-	MagicNumber      U4
-	MinorVersion     U2
-	MajorVersion     U2
-	ConstantPoolSize U2
-	ConstantPool     []ConstantPoolData
-	AccessFlags      U2
-	ClassIndex       U2
-	SuperClassIndex  U2
-	InterfaceLength  U2
-	// interfaces
-	FieldLength U2
-	// fields
-	MethodLength    U2
-	Methods         []*MethodVisitor
-	AttributeLength U2
-	// attributes
+	MinorVersion   uint16
+	MajorVersion   uint16
+	AccessFlags    uint16
+	Name           string
+	SuperClassName string
+
+	constantPoolSize  uint16
+	constantPool      []Constant
+	constantPoolCache map[string]uint16
+
+	interfaceLength uint16
+	fieldLength     uint16
+	methodLength    uint16
+	methods         []*MethodVisitor
+	attributeLength uint16
 }
 
-func NewClass(version int, name string, accessFlags int) *ClassVisitor {
-	visitor := ClassVisitor{}
-	visitor.MagicNumber = U4{U2{0xcafe}, U2{0xbabe}}
-	visitor.MinorVersion = U2{0x0000}
-	visitor.MajorVersion = U2{version}
-	visitor.ConstantPoolSize = U2{0x0001}
+func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) *ClassVisitor {
+	visitor := ClassVisitor{
+		MinorVersion:   0,
+		MajorVersion:   majorVersion,
+		AccessFlags:    accessFlags,
+		Name:           name,
+		SuperClassName: superClass,
 
-	index := visitor.AddConstantPoolDataNext(Class)
-	visitor.AddUtf8Data(name)
-
-	visitor.ClassIndex = U2{index}
-
-	index = visitor.AddConstantPoolDataNext(Class)
-	visitor.AddUtf8Data("java/lang/Object")
-
-	visitor.SuperClassIndex = U2{index}
-	visitor.AccessFlags = U2{accessFlags}
+		constantPoolSize:  1,
+		constantPoolCache: make(map[string]uint16),
+	}
 
 	return &visitor
 }
 
-func (v *ClassVisitor) AddUtf8Data(text string) int {
-	var bytes []int
-	ints := StringToInts(text)
-	length := Int16ToBinary(len(text))
-	bytes = append(bytes, length[0], length[1])
-	bytes = append(bytes, ints...)
-	return v.AddConstantPoolData(Utf8, bytes...)
+func (v *ClassVisitor) PushStringConstant(constant string) uint16 {
+	position := v.PushUtf8Constant(constant)
+	return v.PushUInt16Constant(String, position)
+}
+
+func (v *ClassVisitor) PushClassConstant(constant string) uint16 {
+	position := v.PushUtf8Constant(constant)
+	return v.PushUInt16Constant(Class, position)
+}
+
+func (v *ClassVisitor) PushUtf8Constant(constant string) uint16 {
+	var bytes []byte
+	bytes = append(bytes, Int16ToBinary(uint16(len(constant)))...)
+	bytes = append(bytes, []byte(constant)...)
+	return v.PushConstant(Utf8, bytes...)
+}
+
+func (v *ClassVisitor) PushUInt16Constant(tag byte, constants ...uint16) uint16 {
+	var bytes []byte
+	for _, constant := range constants {
+		bytes = append(bytes, Int16ToBinary(constant)...)
+	}
+	return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushUInt32Constant(tag byte, constants ...uint32) uint16 {
+	var bytes []byte
+	for _, constant := range constants {
+		bytes = append(bytes, Int32ToBinary(constant)...)
+	}
+	return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushUInt64Constant(tag byte, constants ...uint64) uint16 {
+	var bytes []byte
+	for _, constant := range constants {
+		bytes = append(bytes, Int64ToBinary(constant)...)
+	}
+	return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushFloat32Constant(tag byte, constants ...float32) uint16 {
+	var bytes []byte
+	for _, constant := range constants {
+		bytes = append(bytes, Float32ToBinary(constant)...)
+	}
+	return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushFloat64Constant(tag byte, constants ...float64) uint16 {
+	var bytes []byte
+	for _, constant := range constants {
+		bytes = append(bytes, Float64ToBinary(constant)...)
+	}
+	return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushNameAndTypeConstant(name, descriptor string) uint16 {
+	namePosition := v.PushUtf8Constant(name)
+	descriptorPosition := v.PushUtf8Constant(descriptor)
+
+	return v.PushUInt16Constant(NameAndType, namePosition, descriptorPosition)
+}
+
+func (v *ClassVisitor) PushMethodRefConstant(class, name, descriptor string) uint16 {
+	classPosition := v.PushClassConstant(class)
+	natPosition := v.PushNameAndTypeConstant(name, descriptor)
+
+	return v.PushUInt16Constant(Methodref, classPosition, natPosition)
+}
+
+func (v *ClassVisitor) PushFieldRefConstant(class, name, descriptor string) uint16 {
+	classPosition := v.PushClassConstant(class)
+	natPosition := v.PushNameAndTypeConstant(name, descriptor)
+
+	return v.PushUInt16Constant(Fieldref, classPosition, natPosition)
+}
+
+func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
+	base16 := fmt.Sprintf("%x", constant)
+	position, ok := v.constantPoolCache[base16]
+	if ok {
+		return position
+	}
+
+	data := Constant{
+		Tag:  tag,
+		Info: constant,
+	}
+	v.constantPool = append(v.constantPool, data)
+
+	index := v.constantPoolSize
+
+	v.constantPoolSize++
+
+	v.constantPoolCache[base16] = index
+	return index
 }
 
 func (v *ClassVisitor) AsBytecode() []byte {
-	var buf []int
-	buf = append(buf, v.MagicNumber.Get()...)
-	buf = append(buf, v.MinorVersion.Get()...)
-	buf = append(buf, v.MajorVersion.Get()...)
-	buf = append(buf, v.ConstantPoolSize.Get()...)
+	classPosition := v.PushClassConstant(v.Name)
+	superClassPosition := v.PushClassConstant(v.SuperClassName)
 
-	for _, pool := range v.ConstantPool {
-		buf = append(buf, pool.Tag)
-		buf = append(buf, pool.Info...)
+	var methods [][]byte
+	for _, method := range v.methods {
+		methods = append(methods, method.AsBytecode())
 	}
 
-	buf = append(buf, v.AccessFlags.Get()...)
-	buf = append(buf, v.ClassIndex.Get()...)
-	buf = append(buf, v.SuperClassIndex.Get()...)
+	buffer := Buffer{}
+	buffer.PushUInt32(0xcafebabe)
+	buffer.PushUInt16(v.MinorVersion, v.MajorVersion)
+	buffer.PushUInt16(v.constantPoolSize)
 
-	buf = append(buf, v.InterfaceLength.Get()...)
-	buf = append(buf, v.FieldLength.Get()...)
-
-	buf = append(buf, v.MethodLength.Get()...)
-	for _, method := range v.Methods {
-		buf = append(buf, method.AccessFlags.Get()...)
-		buf = append(buf, method.MethodName.Get()...)
-		buf = append(buf, method.MethodType.Get()...)
-		buf = append(buf, method.AttributeLength.Get()...)
-
-		for _, attr := range method.Attributes {
-			buf = append(buf, attr.AttributeNameIndex.Get()...)
-			buf = append(buf, attr.AttributeLength.Get()...)
-			for _, info := range attr.Info {
-				buf = append(buf, info)
-			}
-		}
+	for _, pool := range v.constantPool {
+		buffer.PushBytes(pool.Tag)
+		buffer.PushBytes(pool.Info...)
 	}
 
-	buf = append(buf, v.AttributeLength.Get()...)
+	buffer.PushUInt16(v.AccessFlags)
 
-	bytes := make([]byte, len(buf))
-	for i, b := range buf {
-		bytes[i] = byte(b)
+	buffer.PushUInt16(classPosition)
+	buffer.PushUInt16(superClassPosition)
+
+	buffer.PushUInt16(v.interfaceLength)
+	buffer.PushUInt16(v.fieldLength)
+	buffer.PushUInt16(v.methodLength)
+	for _, bytes := range methods {
+		buffer.PushBytes(bytes...)
 	}
-	return bytes
+	buffer.PushUInt16(v.attributeLength)
+
+	return buffer.Get()
 }
 
-func (v *ClassVisitor) NextConstantIndex() int {
-	return v.ConstantPoolSize.V + 1
-}
+func (v *ClassVisitor) NewMethod(accessFlags uint16, name, descriptor string) *MethodVisitor {
+	visitor := MethodVisitor{
+		Class:       v,
+		AccessFlags: accessFlags,
+		Name:        name,
+		Descriptor:  descriptor,
+	}
+	v.methodLength++
+	v.methods = append(v.methods, &visitor)
 
-func (v *ClassVisitor) AddConstantPoolData(tag int, args ...int) int {
-	v.ConstantPool = append(v.ConstantPool, ConstantPoolData{tag, args})
-	v.ConstantPoolSize.V += 1
-	return v.ConstantPoolSize.V - 1
-}
-
-func (v *ClassVisitor) AddConstantPoolDataNext(tag int) int {
-	index := Int16ToBinary(v.NextConstantIndex())
-	return v.AddConstantPoolData(tag, index[0], index[1])
-}
-
-func (v *ClassVisitor) NewMethod(accessFlags int, name string, descriptor string) *MethodVisitor {
-	nameIndex := v.AddUtf8Data(name)
-	descriptorIndex := v.AddUtf8Data(descriptor)
-	codeIndex := v.AddUtf8Data("Code")
-
-	visitor := MethodVisitor{}
-	visitor.ParentVisitor = v
-	visitor.AccessFlags = U2{accessFlags}
-	visitor.MethodName = U2{nameIndex}
-	visitor.MethodType = U2{descriptorIndex}
-	visitor.AttributeLength = U2{0x0001}
 	visitor.MaxLocals += DescriptorToStackSize(descriptor)[0]
 	if accessFlags&AccStatic != AccStatic {
 		visitor.MaxLocals++
 	}
-
-	codeAttr := AttributeInfo{}
-	codeAttr.AttributeNameIndex = U2{codeIndex}
-
-	visitor.Attributes = append(visitor.Attributes, &codeAttr)
-
-	v.MethodLength.V += 1
-	v.Methods = append(v.Methods, &visitor)
 	return &visitor
 }
 
 type MethodVisitor struct {
-	ParentVisitor *ClassVisitor
+	Class       *ClassVisitor
+	AccessFlags uint16
+	Name        string
+	Descriptor  string
 
-	AccessFlags     U2
-	MethodName      U2
-	MethodType      U2
-	AttributeLength U2
-	Attributes      []*AttributeInfo
+	MaxLocals uint16
+	MaxStack  uint16
 
-	MaxStack  int
-	MaxLocals int
-	CodeSize  U4
+	StackObserver     uint16
+	InvokeDescriptors []string
+
+	Instructions    []Instruction
+	InstructionData [][]byte
 }
 
-func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
-	var index int
+func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
+	var index uint16
 	switch javaType {
 	case TypeChar:
 		fallthrough
@@ -484,193 +263,104 @@ func (m *MethodVisitor) AddLdc(javaType int, object interface{}) {
 	case TypeBoolean:
 		fallthrough
 	case TypeInt:
-		index = m.ParentVisitor.AddConstantPoolData(Integer, Int32ToBinary(object.(int))...)
-		m.AddInsn(Ldc, index)
+		index = m.Class.PushUInt32Constant(Integer, object.(uint32))
+		m.AddInsn(Ldc, byte(index))
 		break
 	case TypeFloat:
-		index = m.ParentVisitor.AddConstantPoolData(Float, Float32ToBinary(object.(float32))...)
-		m.AddInsn(Ldc, index)
+		index = m.Class.PushFloat32Constant(Float, object.(float32))
+		m.AddInsn(Ldc, byte(index))
 		break
 	case TypeDouble:
-		index = m.ParentVisitor.AddConstantPoolData(Double, Float64ToBinary(object.(float64))...)
-		m.AddInsn(Ldc2w, index)
+		index = m.Class.PushFloat64Constant(Double, object.(float64))
+		m.AddInsn(Ldc2w, byte(index))
 		break
 	case TypeLong:
-		index = m.ParentVisitor.AddConstantPoolData(Long, Int64ToBinary(object.(int64))...)
-		m.AddInsn(Ldc2w, index)
+		index = m.Class.PushUInt64Constant(Long, object.(uint64))
+		m.AddInsn(Ldc2w, byte(index))
 		break
 	case TypeString:
-		index = m.ParentVisitor.AddConstantPoolDataNext(String)
-		m.ParentVisitor.AddUtf8Data(fmt.Sprintf("%v", object))
-		m.AddInsn(Ldc, index)
+		index = m.Class.PushStringConstant(object.(string))
+		m.AddInsn(Ldc, byte(index))
 		break
 	}
 }
 
-func (m *MethodVisitor) AddMethodInsn(insn int, instance, name, descriptor string, isInterface bool) {
-	if isInterface {
-		m.addRefInsn(InterfaceMethodref, insn, instance, name, descriptor)
-	} else {
-		m.addRefInsn(Methodref, insn, instance, name, descriptor)
-	}
+func (m *MethodVisitor) AddVarInsn(insn Instruction, args uint16) {
+	m.AddInsn(insn, Int16ToBinary(args)...)
+	m.MaxLocals++
 }
 
-func (m *MethodVisitor) AddFieldInsn(insn int, instance, name, descriptor string) {
-	m.addRefInsn(Fieldref, insn, instance, name, descriptor)
+func (m *MethodVisitor) AddMethodInsn(insn Instruction, instance, name, descriptor string) {
+	methodRefPosition := m.Class.PushMethodRefConstant(instance, name, descriptor)
+
+	m.InvokeDescriptors = append(m.InvokeDescriptors, descriptor)
+	m.AddInsn(insn, Int16ToBinary(methodRefPosition)...)
 }
 
-func (m *MethodVisitor) addRefInsn(ref int, insn int, instance, name, descriptor string) {
-	iIndex := m.ParentVisitor.AddConstantPoolDataNext(Class)
-	m.ParentVisitor.AddUtf8Data(instance)
+func (m *MethodVisitor) AddFieldInsn(insn Instruction, instance, name, descriptor string) {
+	fieldRefPosition := m.Class.PushFieldRefConstant(instance, name, descriptor)
 
-	nIndex := m.ParentVisitor.AddUtf8Data(name)
-	dIndex := m.ParentVisitor.AddUtf8Data(descriptor)
-
-	nIndexB := Int16ToBinary(nIndex)
-	dIndexB := Int16ToBinary(dIndex)
-	ntIndex := m.ParentVisitor.AddConstantPoolData(NameAndType,
-		nIndexB[0], nIndexB[1], dIndexB[0], dIndexB[1])
-
-	ntIndexB := Int16ToBinary(ntIndex)
-	iIndexB := Int16ToBinary(iIndex)
-	mrIndex := m.ParentVisitor.AddConstantPoolData(ref,
-		iIndexB[0], iIndexB[1], ntIndexB[0], ntIndexB[1])
-
-	mrIndexB := Int16ToBinary(mrIndex)
-	m.AddInsn(insn, mrIndexB[0], mrIndexB[1])
+	m.AddInsn(insn, Int16ToBinary(fieldRefPosition)...)
 }
 
-func (m *MethodVisitor) AddVarInsn(insn int, value ...int) {
-	m.AddInsn(insn, value...)
-	m.MaxLocals += 1
+func (m *MethodVisitor) AddInsn(insn Instruction, data ...byte) {
+	m.Instructions = append(m.Instructions, insn)
+	m.InstructionData = append(m.InstructionData, data)
 }
 
-func (m *MethodVisitor) AddInsn(insn int, args ...int) {
-	attr := m.Attributes[0]
-	attr.Info = append(attr.Info, insn)
-	attr.Info = append(attr.Info, args...)
-
-	attr.ByteSize += 1 + len(args)
-
-	sizeInc := Int16ToBinary(attr.ByteSize)
-	m.CodeSize.V1 = U2{sizeInc[0]}
-	m.CodeSize.V2 = U2{sizeInc[1]}
+func (m *MethodVisitor) Maxs(maxStack, maxLocals uint16) {
+	m.MaxStack = maxStack
+	m.MaxLocals = maxLocals
 }
 
-func (m *MethodVisitor) End(maxStack int) {
-	m.EndManual(maxStack, m.MaxLocals)
-}
+func (m *MethodVisitor) AsBytecode() []byte {
+	namePosition := m.Class.PushUtf8Constant(m.Name)
+	descriptorPosition := m.Class.PushUtf8Constant(m.Descriptor)
+	codePosition := m.Class.PushUtf8Constant("Code")
 
-func (m *MethodVisitor) EndManual(maxStack, maxLocals int) {
-	attr := m.Attributes[0]
-	attr.AttributeLength = U4{U2{0x0000}, U2{attr.ByteSize + 12}}
+	insnBuffer := Buffer{}
+	var stack uint16
+	invokeIndex := 0
+	for i, value := range m.Instructions {
+		data := m.InstructionData[i]
+		if value.StackIntakeFlag == FlagStackArgs {
+			args := DescriptorToStackSize(m.InvokeDescriptors[invokeIndex])
 
-	maxStackBytes := Int16ToBinary(maxStack)
-	maxLocalsBytes := Int16ToBinary(maxLocals)
-
-	var attrInfo []int
-	attrInfo = append(attrInfo, maxStackBytes[0], maxStackBytes[1])
-	attrInfo = append(attrInfo, maxLocalsBytes[0], maxLocalsBytes[1])
-
-	attrInfo = append(attrInfo, m.CodeSize.Get()...)
-
-	attrInfo = append(attrInfo, attr.Info...)
-	attrInfo = append(attrInfo, 0, 0, 0, 0)
-
-	attr.Info = attrInfo
-}
-
-type AttributeInfo struct {
-	AttributeNameIndex U2
-	AttributeLength    U4
-	Info               []int
-
-	ByteSize int
-}
-
-func StringToInts(text string) []int {
-	bytes := []byte(text)
-
-	return BytesToInts(bytes)
-}
-
-func Float32ToBinary(value float32) []int {
-	bytes := make([]byte, 4)
-	bits := math.Float32bits(value)
-	binary.BigEndian.PutUint32(bytes, bits)
-
-	return BytesToInts(bytes)
-}
-
-func Float64ToBinary(value float64) []int {
-	bytes := make([]byte, 8)
-	bits := math.Float64bits(value)
-	binary.BigEndian.PutUint64(bytes, bits)
-
-	return BytesToInts(bytes)
-}
-
-func Int16ToBinary(value int) []int {
-	bytes := make([]byte, 2)
-	bytes[1] = (byte)(value & 0xFF)
-	bytes[0] = (byte)((value >> 8) & 0xFF)
-
-	return BytesToInts(bytes)
-}
-
-func Int32ToBinary(value int) []int {
-	bytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(bytes, uint32(value))
-
-	return BytesToInts(bytes)
-}
-
-func Int64ToBinary(value int64) []int {
-	bytes := make([]byte, 4)
-	binary.BigEndian.PutUint64(bytes, uint64(value))
-
-	return BytesToInts(bytes)
-}
-
-func BytesToInts(bytes []byte) []int {
-	ints := make([]int, len(bytes))
-	for i, b := range bytes {
-		ints[i] = int(b)
-	}
-	return ints
-}
-
-func DescriptorToStackSize(descriptor string) []int {
-	beginIndex := strings.LastIndex(descriptor, "(")
-	endIndex := strings.LastIndex(descriptor, ")")
-
-	sizes := make([]int, 2)
-	for i := beginIndex; i < endIndex; i++ {
-		char := []rune(descriptor)[i]
-
-		if char == '[' {
-			continue
-		}
-
-		if char == 'L' {
-			sizes[0] += 1
-
-			end := strings.Index(descriptor, ";")
-
-			i = end
-			if i > endIndex {
-				break
+			invokeIndex++
+			stack -= args[0] + value.StackIntake
+			if value.StackOutputFlag == FlagStackEmpty {
+				stack = args[1] // empty the stack and add output size
+			} else {
+				stack += args[1] // add output size
 			}
-			continue
+		} else if value.StackOutputFlag == FlagStackEmpty {
+			stack = value.StackOutput
+		} else {
+			stack -= value.StackIntake
+			stack += value.StackOutput
 		}
+		if stack > m.MaxStack {
+			m.MaxStack = stack
+		}
+		insnBuffer.PushBytes(value.Opcode)
+		insnBuffer.PushBytes(data...)
+	}
 
-		sizes[0] += 1
-	}
-	sizes[0] -= 1
-	sub := strings.Split(descriptor, ")")[1]
-	if sub == "V" {
-		return sizes
-	}
-	sizes[1] = 1
-	return sizes
+	buffer := Buffer{}
+	buffer.PushUInt16(m.AccessFlags)
+	buffer.PushUInt16(namePosition)
+	buffer.PushUInt16(descriptorPosition)
+	buffer.PushUInt16(1) // attribute count
+
+	// Code attribute
+	buffer.PushUInt16(codePosition)
+	buffer.PushUInt32(uint32(len(insnBuffer.Get()) + 12)) // code size
+	buffer.PushUInt16(m.MaxStack, m.MaxLocals)
+	buffer.PushUInt32(uint32(len(insnBuffer.Get()))) // insn size
+
+	buffer.PushBytes(insnBuffer.Get()...) // instructions
+
+	buffer.PushBytes(0, 0, 0, 0) // exceptions + attributes
+
+	return buffer.Get()
 }

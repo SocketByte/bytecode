@@ -1,30 +1,30 @@
 package main
 
 import (
+	"bytecode"
 	"fmt"
 	"os"
 	"os/exec"
-
-	"bytecode"
 )
 
 func main() {
-	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
+	visitor := bytecode.NewClass(bytecode.Java5,
+		"HelloWorld", "java/lang/Object",
+		bytecode.AccPublic|bytecode.AccSuper)
+
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
 	init.AddInsn(bytecode.Aload0)
-	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object",
-		"<init>", "()V", false)
+	init.AddMethodInsn(bytecode.Invokespecial,
+		"java/lang/Object", "<init>", "()V")
 	init.AddInsn(bytecode.Return)
-	init.End(1)
 
 	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
 		"main", "([Ljava/lang/String;)V")
 	method.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
-	method.AddLdc(bytecode.TypeString, "Hello, World!")
-	method.AddMethodInsn(bytecode.Invokevirtual, "java/io/PrintStream",
-		"println", "(Ljava/lang/String;)V", false)
+	method.AddLdcInsn(bytecode.TypeString, "Hello, World!")
+	method.AddMethodInsn(bytecode.Invokevirtual,
+		"java/io/PrintStream", "println", "(Ljava/lang/String;)V")
 	method.AddInsn(bytecode.Return)
-	method.End(2)
 
 	RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }
