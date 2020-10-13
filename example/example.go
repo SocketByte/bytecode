@@ -13,11 +13,11 @@ func main() {
 
 	visitor := bytecode.NewClass(bytecode.Java5, "HelloWorld", bytecode.AccPublic|bytecode.AccSuper)
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
-	init.AddLoadInsn(bytecode.Aload0)
+	init.AddInsn(bytecode.Aload0)
 	init.AddMethodInsn(bytecode.Invokespecial, "java/lang/Object",
 		"<init>", "()V", false)
 	init.AddInsn(bytecode.Return)
-	init.End()
+	init.End(1)
 
 	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
 		"main", "([Ljava/lang/String;)V")
@@ -26,7 +26,15 @@ func main() {
 	method.AddMethodInsn(bytecode.Invokevirtual, "java/io/PrintStream",
 		"println", "(Ljava/lang/String;)V", false)
 	method.AddInsn(bytecode.Return)
-	method.End()
+	method.End(2)
+
+	add := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic,
+		"add", "(II)I")
+	add.AddInsn(bytecode.Iload1)
+	add.AddInsn(bytecode.Iload2)
+	add.AddInsn(bytecode.Iadd)
+	add.AddInsn(bytecode.Ireturn)
+	add.End(2)
 
 	RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }
