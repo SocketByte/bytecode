@@ -73,11 +73,11 @@ const TypeFloat = 8
 const TypeChar = 9
 
 type Instruction struct {
-	Opcode          byte
-	StackIntake     uint16
-	StackIntakeFlag int
-	StackOutput     uint16
-	StackOutputFlag int
+    Opcode          byte
+    StackIntake     uint16
+    StackIntakeFlag int
+    StackOutput     uint16
+    StackOutputFlag int
 }
 
 const FlagStackEmpty = 0xaa
