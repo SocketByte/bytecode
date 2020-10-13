@@ -58,15 +58,15 @@ type ClassVisitor struct {
     Name           string
     SuperClassName string
 
-    constantPoolSize  uint16
-    constantPool      []Constant
-    constantPoolCache map[string]uint16
+    ConstantPoolSize  uint16
+    ConstantPool      []Constant
+    ConstantPoolCache map[string]uint16
 
-    interfaceLength uint16
-    fieldLength     uint16
-    methodLength    uint16
-    methods         []*MethodVisitor
-    attributeLength uint16
+    InterfaceLength uint16
+    FieldLength     uint16
+    MethodLength    uint16
+    Methods         []*MethodVisitor
+    AttributeLength uint16
 }
 
 func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) *ClassVisitor {
@@ -77,8 +77,8 @@ func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) 
         Name:           name,
         SuperClassName: superClass,
 
-        constantPoolSize:  1,
-        constantPoolCache: make(map[string]uint16),
+        ConstantPoolSize:  1,
+        ConstantPoolCache: make(map[string]uint16),
     }
 
     return &visitor
@@ -164,7 +164,7 @@ func (v *ClassVisitor) PushFieldRefConstant(class, name, descriptor string) uint
 
 func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
     base16 := fmt.Sprintf("%x", constant)
-    position, ok := v.constantPoolCache[base16]
+    position, ok := v.ConstantPoolCache[base16]
     if ok {
         return position
     }
@@ -173,13 +173,13 @@ func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
         Tag:  tag,
         Info: constant,
     }
-    v.constantPool = append(v.constantPool, data)
+    v.ConstantPool = append(v.ConstantPool, data)
 
-    index := v.constantPoolSize
+    index := v.ConstantPoolSize
 
-    v.constantPoolSize++
+    v.ConstantPoolSize++
 
-    v.constantPoolCache[base16] = index
+    v.ConstantPoolCache[base16] = index
     return index
 }
 
@@ -188,16 +188,16 @@ func (v *ClassVisitor) AsBytecode() []byte {
     superClassPosition := v.PushClassConstant(v.SuperClassName)
 
     var methods [][]byte
-    for _, method := range v.methods {
+    for _, method := range v.Methods {
         methods = append(methods, method.AsBytecode())
     }
 
     buffer := Buffer{}
     buffer.PushUInt32(0xcafebabe)
     buffer.PushUInt16(v.MinorVersion, v.MajorVersion)
-    buffer.PushUInt16(v.constantPoolSize)
+    buffer.PushUInt16(v.ConstantPoolSize)
 
-    for _, pool := range v.constantPool {
+    for _, pool := range v.ConstantPool {
         buffer.PushBytes(pool.Tag)
         buffer.PushBytes(pool.Info...)
     }
@@ -207,13 +207,13 @@ func (v *ClassVisitor) AsBytecode() []byte {
     buffer.PushUInt16(classPosition)
     buffer.PushUInt16(superClassPosition)
 
-    buffer.PushUInt16(v.interfaceLength)
-    buffer.PushUInt16(v.fieldLength)
-    buffer.PushUInt16(v.methodLength)
+    buffer.PushUInt16(v.InterfaceLength)
+    buffer.PushUInt16(v.FieldLength)
+    buffer.PushUInt16(v.MethodLength)
     for _, bytes := range methods {
         buffer.PushBytes(bytes...)
     }
-    buffer.PushUInt16(v.attributeLength)
+    buffer.PushUInt16(v.AttributeLength)
 
     return buffer.Get()
 }
@@ -225,8 +225,8 @@ func (v *ClassVisitor) NewMethod(accessFlags uint16, name, descriptor string) *M
         Name:        name,
         Descriptor:  descriptor,
     }
-    v.methodLength++
-    v.methods = append(v.methods, &visitor)
+    v.MethodLength++
+    v.Methods = append(v.Methods, &visitor)
 
     visitor.MaxLocals += DescriptorToStackSize(descriptor)[0]
     if accessFlags&AccStatic != AccStatic {
