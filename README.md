@@ -11,6 +11,15 @@ Very simple bytecode generation library for Go
 - Simple and self-documented codebase
 - Constant pool caching
 
+## Missing features (yet)
+- Annotation support
+- `LineNumberTable` support
+- `SourceFile` attribute
+- Exception support (`throws`)
+- Interface support
+- Inner classes
+- Stack frames
+
 ## Basic example
 ```go
 package main
