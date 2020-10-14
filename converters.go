@@ -30,6 +30,14 @@ func Int16ToBinary(value uint16) []byte {
     return bytes
 }
 
+func SInt16ToBinary(value int16) []byte {
+    bytes := make([]byte, 2)
+    bytes[1] = (byte)(value & 0xFF)
+    bytes[0] = (byte)((value >> 8) & 0xFF)
+
+    return bytes
+}
+
 func Int32ToBinary(value uint32) []byte {
     bytes := make([]byte, 4)
     binary.BigEndian.PutUint32(bytes, value)
@@ -37,9 +45,33 @@ func Int32ToBinary(value uint32) []byte {
     return bytes
 }
 
+func SInt32ToBinary(value int) []byte {
+    bytes := make([]byte, 4)
+    bytes[0] = byte(value >> 24)
+    bytes[1] = byte(value >> 16)
+    bytes[2] = byte(value >> 8)
+    bytes[3] = byte(value)
+
+    return bytes
+}
+
 func Int64ToBinary(value uint64) []byte {
     bytes := make([]byte, 8)
     binary.BigEndian.PutUint64(bytes, value)
+
+    return bytes
+}
+
+func SInt64ToBinary(value int64) []byte {
+    bytes := make([]byte, 8)
+    bytes[0] = byte(value >> 56)
+    bytes[1] = byte(value >> 48)
+    bytes[2] = byte(value >> 40)
+    bytes[3] = byte(value >> 32)
+    bytes[4] = byte(value >> 24)
+    bytes[5] = byte(value >> 16)
+    bytes[6] = byte(value >> 8)
+    bytes[7] = byte(value)
 
     return bytes
 }

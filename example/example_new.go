@@ -8,23 +8,46 @@ import (
 )
 
 func main() {
+	// Create new Java class
 	visitor := bytecode.NewClass(bytecode.Java5,
 		"HelloWorld", "java/lang/Object",
 		bytecode.AccPublic|bytecode.AccSuper)
 
+	// Append 2 global fields
+	visitor.NewField(bytecode.AccPublic, "globalValue", "I")
+	visitor.NewField(bytecode.AccPublic, "globalString", "Ljava/lang/String;")
+
+	// Create new basic constructor
 	init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
 	init.AddInsn(bytecode.Aload0)
 	init.AddMethodInsn(bytecode.Invokespecial,
 		"java/lang/Object", "<init>", "()V")
 	init.AddInsn(bytecode.Return)
 
-	method := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
+	// Create main method
+	main := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
 		"main", "([Ljava/lang/String;)V")
-	method.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
-	method.AddLdcInsn(bytecode.TypeString, "Hello, World!")
-	method.AddMethodInsn(bytecode.Invokevirtual,
+	// Push -3 as byte value
+	main.AddInt8Insn(bytecode.Bipush, -3)
+	// Store at 1
+	main.AddInsn(bytecode.Istore1)
+	// Load 1
+	main.AddInsn(bytecode.Iload1)
+	// Push 2 as int value
+	main.AddInsn(bytecode.Iconst2)
+	// Create a new jump label
+	label := main.NewLabel()
+	// Add jump instruction (control-flow) to a newly created label
+	main.AddJumpInsn(bytecode.Ificmpge, label)
+	// System.out.println("Hello, World!");
+	main.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
+	main.AddLdcInsn(bytecode.TypeString, "Hello, World!")
+	main.AddMethodInsn(bytecode.Invokevirtual,
 		"java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-	method.AddInsn(bytecode.Return)
+	// Add return to the method
+	main.AddInsn(bytecode.Return)
+	// Set label to point to "return" instruction (jump to return)
+	main.AddLabel(label)
 
 	RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }

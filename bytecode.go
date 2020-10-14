@@ -64,6 +64,7 @@ type ClassVisitor struct {
 
     InterfaceLength uint16
     FieldLength     uint16
+    Fields          []*FieldVisitor
     MethodLength    uint16
     Methods         []*MethodVisitor
     AttributeLength uint16
@@ -117,10 +118,27 @@ func (v *ClassVisitor) PushUInt32Constant(tag byte, constants ...uint32) uint16 
     return v.PushConstant(tag, bytes...)
 }
 
+
+func (v *ClassVisitor) PushInt32Constant(tag byte, constants ...int) uint16 {
+    var bytes []byte
+    for _, constant := range constants {
+        bytes = append(bytes, SInt32ToBinary(constant)...)
+    }
+    return v.PushConstant(tag, bytes...)
+}
+
 func (v *ClassVisitor) PushUInt64Constant(tag byte, constants ...uint64) uint16 {
     var bytes []byte
     for _, constant := range constants {
         bytes = append(bytes, Int64ToBinary(constant)...)
+    }
+    return v.PushConstant(tag, bytes...)
+}
+
+func (v *ClassVisitor) PushInt64Constant(tag byte, constants ...int64) uint16 {
+    var bytes []byte
+    for _, constant := range constants {
+        bytes = append(bytes, SInt64ToBinary(constant)...)
     }
     return v.PushConstant(tag, bytes...)
 }
@@ -192,6 +210,11 @@ func (v *ClassVisitor) AsBytecode() []byte {
         methods = append(methods, method.AsBytecode())
     }
 
+    var fields [][]byte
+    for _, field := range v.Fields {
+        fields = append(fields, field.AsBytecode())
+    }
+
     buffer := Buffer{}
     buffer.PushUInt32(0xcafebabe)
     buffer.PushUInt16(v.MinorVersion, v.MajorVersion)
@@ -209,6 +232,9 @@ func (v *ClassVisitor) AsBytecode() []byte {
 
     buffer.PushUInt16(v.InterfaceLength)
     buffer.PushUInt16(v.FieldLength)
+    for _, bytes := range fields {
+        buffer.PushBytes(bytes...)
+    }
     buffer.PushUInt16(v.MethodLength)
     for _, bytes := range methods {
         buffer.PushBytes(bytes...)
@@ -235,6 +261,36 @@ func (v *ClassVisitor) NewMethod(accessFlags uint16, name, descriptor string) *M
     return &visitor
 }
 
+func (v *ClassVisitor) NewField(accessFlags uint16, name, descriptor string) *FieldVisitor {
+    visitor := FieldVisitor{
+        Class: v,
+        AccessFlags: accessFlags,
+        Name: name,
+        Descriptor: descriptor,
+    }
+    v.FieldLength++
+    v.Fields = append(v.Fields, &visitor)
+    return &visitor
+}
+
+type FieldVisitor struct {
+    Class       *ClassVisitor
+    AccessFlags uint16
+    Name        string
+    Descriptor  string
+}
+
+func (f *FieldVisitor) AsBytecode() []byte {
+    namePosition := f.Class.PushUtf8Constant(f.Name)
+    descriptorPosition := f.Class.PushUtf8Constant(f.Descriptor)
+
+    buffer := Buffer{}
+    buffer.PushUInt16(f.AccessFlags)
+    buffer.PushUInt16(namePosition, descriptorPosition)
+    buffer.PushUInt16(0) // zero attributes
+    return buffer.Get()
+}
+
 type MethodVisitor struct {
     Class       *ClassVisitor
     AccessFlags uint16
@@ -247,8 +303,11 @@ type MethodVisitor struct {
     StackObserver     uint16
     InvokeDescriptors []string
 
-    Instructions    []Instruction
-    InstructionData [][]byte
+    InstructionLabels []*Label
+    Instructions      []Instruction
+    InstructionData   [][]byte
+
+    CurrentByte uint16
 }
 
 func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
@@ -263,7 +322,7 @@ func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
     case TypeBoolean:
         fallthrough
     case TypeInt:
-        index = m.Class.PushUInt32Constant(Integer, object.(uint32))
+        index = m.Class.PushInt32Constant(Integer, object.(int))
         m.AddInsn(Ldc, byte(index))
         break
     case TypeFloat:
@@ -275,7 +334,7 @@ func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
         m.AddInsn(Ldc2w, byte(index))
         break
     case TypeLong:
-        index = m.Class.PushUInt64Constant(Long, object.(uint64))
+        index = m.Class.PushInt64Constant(Long, object.(int64))
         m.AddInsn(Ldc2w, byte(index))
         break
     case TypeString:
@@ -285,9 +344,42 @@ func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
     }
 }
 
-func (m *MethodVisitor) AddVarInsn(insn Instruction, args uint16) {
-    m.AddInsn(insn, Int16ToBinary(args)...)
+func (m *MethodVisitor) AddVarInsn(insn Instruction, value ...uint16) {
+    if len(value) > 0 {
+        m.AddInsn(insn, Int16ToBinary(value[0])...)
+    } else {
+        m.AddInsn(insn)
+    }
     m.MaxLocals++
+}
+
+func (m *MethodVisitor) NewLabel() *Label {
+    return &Label{0}
+}
+
+func (m *MethodVisitor) AddLabel(label *Label) {
+    label.ByteOffset = m.CurrentByte + 1
+}
+
+func (m *MethodVisitor) AddJumpInsn(insn Instruction, label *Label) {
+    m.AddInsn(insn)
+    m.InstructionLabels = append(m.InstructionLabels, label)
+}
+
+func (m *MethodVisitor) AddInt8Insn(insn Instruction, value int8) {
+    m.AddInsn(insn, byte(value))
+}
+
+func (m *MethodVisitor) AddInt16Insn(insn Instruction, value int16) {
+    m.AddInsn(insn, SInt16ToBinary(value)...)
+}
+
+func (m *MethodVisitor) AddInt32Insn(insn Instruction, value int) {
+    m.AddInsn(insn, SInt32ToBinary(value)...)
+}
+
+func (m *MethodVisitor) AddInt64Insn(insn Instruction, value int64) {
+    m.AddInsn(insn, SInt64ToBinary(value)...)
 }
 
 func (m *MethodVisitor) AddMethodInsn(insn Instruction, instance, name, descriptor string) {
@@ -306,6 +398,7 @@ func (m *MethodVisitor) AddFieldInsn(insn Instruction, instance, name, descripto
 func (m *MethodVisitor) AddInsn(insn Instruction, data ...byte) {
     m.Instructions = append(m.Instructions, insn)
     m.InstructionData = append(m.InstructionData, data)
+    m.CurrentByte += uint16(1 + len(data)) // calculate current byte offset
 }
 
 func (m *MethodVisitor) Maxs(maxStack, maxLocals uint16) {
@@ -321,8 +414,15 @@ func (m *MethodVisitor) AsBytecode() []byte {
     insnBuffer := Buffer{}
     var stack uint16
     invokeIndex := 0
+    labelIndex := 0
+    currentByteOffset := uint16(0)
     for i, value := range m.Instructions {
         data := m.InstructionData[i]
+        if value.StackIntakeFlag == FlagStackLabel {
+            label := m.InstructionLabels[labelIndex]
+            data = append(data, Int16ToBinary(label.ByteOffset - currentByteOffset)...)
+            labelIndex++
+        }
         if value.StackIntakeFlag == FlagStackArgs {
             args := DescriptorToStackSize(m.InvokeDescriptors[invokeIndex])
 
@@ -344,12 +444,12 @@ func (m *MethodVisitor) AsBytecode() []byte {
         }
         insnBuffer.PushBytes(value.Opcode)
         insnBuffer.PushBytes(data...)
+        currentByteOffset += uint16(1 + len(data))
     }
 
     buffer := Buffer{}
     buffer.PushUInt16(m.AccessFlags)
-    buffer.PushUInt16(namePosition)
-    buffer.PushUInt16(descriptorPosition)
+    buffer.PushUInt16(namePosition, descriptorPosition)
     buffer.PushUInt16(1) // attribute count
 
     // Code attribute
@@ -364,3 +464,8 @@ func (m *MethodVisitor) AsBytecode() []byte {
 
     return buffer.Get()
 }
+
+type Label struct {
+    ByteOffset uint16
+}
+
