@@ -14,7 +14,6 @@ Very simple bytecode generation library for Go
 ## Missing features (yet)
 - Annotation support
 - `LineNumberTable` support
-- `SourceFile` attribute
 - Exception support (`throws`)
 - Interface support
 - Inner classes
@@ -34,6 +33,9 @@ func main() {
     visitor := bytecode.NewClass(bytecode.Java5,
         "HelloWorld", "java/lang/Object",
         bytecode.AccPublic|bytecode.AccSuper)
+ 
+    // Add source file attribute
+    visitor.AddSourceFile("HelloWorld.java")
 
     // Append 2 global fields
     visitor.NewField(bytecode.AccPublic, "globalValue", "I")
@@ -76,44 +78,46 @@ func main() {
 
 ```
 ```
-Classfile /C:/Cloud/GoProjects/bytecode/build/HelloWorld.class
+Classfile HelloWorld.class
 public class HelloWorld
   minor version: 0
   major version: 49
   flags: (0x0021) ACC_PUBLIC, ACC_SUPER
-  this_class: #22                         // HelloWorld
-  super_class: #2                         // java/lang/Object
-  interfaces: 0, fields: 2, methods: 2, attributes: 0
+  this_class: #24                         // HelloWorld
+  super_class: #4                         // java/lang/Object
+  interfaces: 0, fields: 2, methods: 2, attributes: 1
 Constant pool:
-   #1 = Utf8               java/lang/Object
-   #2 = Class              #1             // java/lang/Object
-   #3 = Utf8               <init>
-   #4 = Utf8               ()V
-   #5 = NameAndType        #3:#4          // "<init>":()V
-   #6 = Methodref          #2.#5          // java/lang/Object."<init>":()V
-   #7 = Utf8               java/lang/System
-   #8 = Class              #7             // java/lang/System
-   #9 = Utf8               out
-  #10 = Utf8               Ljava/io/PrintStream;
-  #11 = NameAndType        #9:#10         // out:Ljava/io/PrintStream;
-  #12 = Fieldref           #8.#11         // java/lang/System.out:Ljava/io/PrintStream;
-  #13 = Utf8               Hello, World!
-  #14 = String             #13            // Hello, World!
-  #15 = Utf8               java/io/PrintStream
-  #16 = Class              #15            // java/io/PrintStream
-  #17 = Utf8               println
-  #18 = Utf8               (Ljava/lang/String;)V
-  #19 = NameAndType        #17:#18        // println:(Ljava/lang/String;)V
-  #20 = Methodref          #16.#19        // java/io/PrintStream.println:(Ljava/lang/String;)V
-  #21 = Utf8               HelloWorld
-  #22 = Class              #21            // HelloWorld
-  #23 = Utf8               Code
-  #24 = Utf8               main
-  #25 = Utf8               ([Ljava/lang/String;)V
-  #26 = Utf8               globalValue
-  #27 = Utf8               I
-  #28 = Utf8               globalString
-  #29 = Utf8               Ljava/lang/String;
+   #1 = Utf8               SourceFile
+   #2 = Utf8               HelloWorld.java
+   #3 = Utf8               java/lang/Object
+   #4 = Class              #3             // java/lang/Object
+   #5 = Utf8               <init>
+   #6 = Utf8               ()V
+   #7 = NameAndType        #5:#6          // "<init>":()V
+   #8 = Methodref          #4.#7          // java/lang/Object."<init>":()V
+   #9 = Utf8               java/lang/System
+  #10 = Class              #9             // java/lang/System
+  #11 = Utf8               out
+  #12 = Utf8               Ljava/io/PrintStream;
+  #13 = NameAndType        #11:#12        // out:Ljava/io/PrintStream;
+  #14 = Fieldref           #10.#13        // java/lang/System.out:Ljava/io/PrintStream;
+  #15 = Utf8               Hello, World!
+  #16 = String             #15            // Hello, World!
+  #17 = Utf8               java/io/PrintStream
+  #18 = Class              #17            // java/io/PrintStream
+  #19 = Utf8               println
+  #20 = Utf8               (Ljava/lang/String;)V
+  #21 = NameAndType        #19:#20        // println:(Ljava/lang/String;)V
+  #22 = Methodref          #18.#21        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #23 = Utf8               HelloWorld
+  #24 = Class              #23            // HelloWorld
+  #25 = Utf8               Code
+  #26 = Utf8               main
+  #27 = Utf8               ([Ljava/lang/String;)V
+  #28 = Utf8               globalValue
+  #29 = Utf8               I
+  #30 = Utf8               globalString
+  #31 = Utf8               Ljava/lang/String;
 {
   public int globalValue;
     descriptor: I
@@ -129,7 +133,7 @@ Constant pool:
     Code:
       stack=1, locals=1, args_size=1
          0: aload_0
-         1: invokespecial #6                  // Method java/lang/Object."<init>":()V
+         1: invokespecial #8                  // Method java/lang/Object."<init>":()V
          4: return
 
   public static void main(java.lang.String...);
@@ -142,9 +146,10 @@ Constant pool:
          3: iload_1
          4: iconst_2
          5: if_icmpge     16
-         8: getstatic     #12                 // Field java/lang/System.out:Ljava/io/PrintStream;
-        11: ldc           #14                 // String Hello, World!
-        13: invokevirtual #20                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+         8: getstatic     #14                 // Field java/lang/System.out:Ljava/io/PrintStream;
+        11: ldc           #16                 // String Hello, World!
+        13: invokevirtual #22                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
         16: return
 }
+SourceFile: "HelloWorld.java"
 ```

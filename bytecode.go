@@ -68,6 +68,7 @@ type ClassVisitor struct {
     MethodLength    uint16
     Methods         []*MethodVisitor
     AttributeLength uint16
+    Attributes      [][]byte
 }
 
 func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) *ClassVisitor {
@@ -201,6 +202,19 @@ func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
     return index
 }
 
+func (v *ClassVisitor) AddSourceFile(sourceFile string) {
+    namePosition := v.PushUtf8Constant("SourceFile")
+    sourceFilePositon := v.PushUtf8Constant(sourceFile)
+
+    buffer := Buffer{}
+    buffer.PushUInt16(namePosition)
+    buffer.PushUInt32(2)
+    buffer.PushUInt16(sourceFilePositon)
+
+    v.AttributeLength++
+    v.Attributes = append(v.Attributes, buffer.Get())
+}
+
 func (v *ClassVisitor) AsBytecode() []byte {
     classPosition := v.PushClassConstant(v.Name)
     superClassPosition := v.PushClassConstant(v.SuperClassName)
@@ -240,6 +254,9 @@ func (v *ClassVisitor) AsBytecode() []byte {
         buffer.PushBytes(bytes...)
     }
     buffer.PushUInt16(v.AttributeLength)
+    for _, bytes := range v.Attributes {
+        buffer.PushBytes(bytes...)
+    }
 
     return buffer.Get()
 }

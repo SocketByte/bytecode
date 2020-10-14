@@ -13,6 +13,9 @@ func main() {
 		"HelloWorld", "java/lang/Object",
 		bytecode.AccPublic|bytecode.AccSuper)
 
+	// Add source file attribute
+	visitor.AddSourceFile("HelloWorld.java")
+
 	// Append 2 global fields
 	visitor.NewField(bytecode.AccPublic, "globalValue", "I")
 	visitor.NewField(bytecode.AccPublic, "globalString", "Ljava/lang/String;")
