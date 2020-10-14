@@ -58,20 +58,6 @@ const MethodHandle = 15
 const MethodType = 16
 const InvokeDynamic = 18 // Java 7+ only
 
-/*
-Java types
-*/
-const TypeInt = 0
-const TypeByte = 1
-const TypeShort = 2
-const TypeDouble = 3
-const TypeLong = 4
-const TypeString = 5
-const TypeObject = 6
-const TypeBoolean = 7
-const TypeFloat = 8
-const TypeChar = 9
-
 type Instruction struct {
     Opcode          byte
     StackIntake     uint16
