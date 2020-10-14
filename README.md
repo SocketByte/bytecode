@@ -33,13 +33,15 @@ func main() {
     visitor := bytecode.NewClass(bytecode.Java5,
         "HelloWorld", "java/lang/Object",
         bytecode.AccPublic|bytecode.AccSuper)
- 
+
     // Add source file attribute
     visitor.AddSourceFile("HelloWorld.java")
 
     // Append 2 global fields
-    visitor.NewField(bytecode.AccPublic, "globalValue", "I")
-    visitor.NewField(bytecode.AccPublic, "globalString", "Ljava/lang/String;")
+    visitor.NewField(bytecode.AccPublic|bytecode.AccFinal,
+        "globalValue", "I", 43)
+    visitor.NewField(bytecode.AccPublic,
+        "globalString", "Ljava/lang/String;", nil)
 
     // Create new basic constructor
     init := visitor.NewMethod(bytecode.AccPublic, "<init>", "()V")
@@ -65,7 +67,7 @@ func main() {
     main.AddJumpInsn(bytecode.Ificmpge, label)
     // System.out.println("Hello, World!");
     main.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
-    main.AddLdcInsn(bytecode.TypeString, "Hello, World!")
+    main.AddLdcInsn(bytecode.Ldc, "Hello, World!")
     main.AddMethodInsn(bytecode.Invokevirtual,
         "java/io/PrintStream", "println", "(Ljava/lang/String;)V")
     // Add return to the method
@@ -78,7 +80,6 @@ func main() {
 
 ```
 ```
-Classfile HelloWorld.class
 public class HelloWorld
   minor version: 0
   major version: 49
@@ -116,12 +117,15 @@ Constant pool:
   #27 = Utf8               ([Ljava/lang/String;)V
   #28 = Utf8               globalValue
   #29 = Utf8               I
-  #30 = Utf8               globalString
-  #31 = Utf8               Ljava/lang/String;
+  #30 = Integer            43
+  #31 = Utf8               ConstantValue
+  #32 = Utf8               globalString
+  #33 = Utf8               Ljava/lang/String;
 {
-  public int globalValue;
+  public final int globalValue;
     descriptor: I
-    flags: (0x0001) ACC_PUBLIC
+    flags: (0x0011) ACC_PUBLIC, ACC_FINAL
+    ConstantValue: int 43
 
   public java.lang.String globalString;
     descriptor: Ljava/lang/String;

@@ -2,6 +2,8 @@ package bytecode
 
 import (
     "fmt"
+    "log"
+    "reflect"
 )
 
 type Buffer struct {
@@ -202,6 +204,38 @@ func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
     return index
 }
 
+func (v *ClassVisitor) PushTypeConstant(constant interface{}) uint16 {
+    switch value := constant.(type) {
+    case int8:
+        return v.PushInt32Constant(Integer, int(value))
+    case int16:
+        return v.PushInt32Constant(Integer, int(value))
+    case int:
+        return v.PushInt32Constant(Integer, value)
+    case int32:
+        return v.PushInt32Constant(Integer, int(value))
+    case int64:
+        return v.PushInt64Constant(Long, value)
+    case uint8:
+        return v.PushInt32Constant(Integer, int(value))
+    case uint16:
+        return v.PushInt32Constant(Integer, int(value))
+    case uint:
+        return v.PushInt32Constant(Integer, int(value))
+    case uint32:
+        return v.PushInt32Constant(Integer, int(value))
+    case uint64:
+        return v.PushInt64Constant(Long, int64(value))
+    case float32:
+        return v.PushFloat32Constant(Float, value)
+    case float64:
+        return v.PushFloat64Constant(Double, value)
+    case string:
+        return v.PushStringConstant(value)
+    }
+    return 0xff // invalid type
+}
+
 func (v *ClassVisitor) AddSourceFile(sourceFile string) {
     namePosition := v.PushUtf8Constant("SourceFile")
     sourceFilePositon := v.PushUtf8Constant(sourceFile)
@@ -278,12 +312,14 @@ func (v *ClassVisitor) NewMethod(accessFlags uint16, name, descriptor string) *M
     return &visitor
 }
 
-func (v *ClassVisitor) NewField(accessFlags uint16, name, descriptor string) *FieldVisitor {
+func (v *ClassVisitor) NewField(accessFlags uint16, name, descriptor string, constantValue interface{}) *FieldVisitor {
     visitor := FieldVisitor{
         Class: v,
         AccessFlags: accessFlags,
         Name: name,
         Descriptor: descriptor,
+
+        Constant: constantValue,
     }
     v.FieldLength++
     v.Fields = append(v.Fields, &visitor)
@@ -295,6 +331,7 @@ type FieldVisitor struct {
     AccessFlags uint16
     Name        string
     Descriptor  string
+    Constant    interface{}
 }
 
 func (f *FieldVisitor) AsBytecode() []byte {
@@ -304,7 +341,25 @@ func (f *FieldVisitor) AsBytecode() []byte {
     buffer := Buffer{}
     buffer.PushUInt16(f.AccessFlags)
     buffer.PushUInt16(namePosition, descriptorPosition)
-    buffer.PushUInt16(0) // zero attributes
+
+    if f.AccessFlags&AccFinal == AccFinal && f.Constant != nil {
+        constantValuePosition := f.Class.PushTypeConstant(f.Constant)
+        if constantValuePosition == 0xff {
+            log.Fatal(fmt.Errorf("field constant value of %s at %s is incorrect",
+                reflect.TypeOf(f.Constant), f.Name))
+        }
+        constantNamePosition := f.Class.PushUtf8Constant("ConstantValue")
+
+        buffer.PushUInt16(1)
+
+        // ConstantValue attribute
+        buffer.PushUInt16(constantNamePosition)
+        buffer.PushUInt32(2) // ConstantValue length
+        buffer.PushUInt16(constantValuePosition)
+
+    } else {
+        buffer.PushUInt16(0) // zero attributes
+    }
     return buffer.Get()
 }
 
@@ -327,38 +382,9 @@ type MethodVisitor struct {
     CurrentByte uint16
 }
 
-func (m *MethodVisitor) AddLdcInsn(javaType int, object interface{}) {
-    var index uint16
-    switch javaType {
-    case TypeChar:
-        fallthrough
-    case TypeByte:
-        fallthrough
-    case TypeShort:
-        fallthrough
-    case TypeBoolean:
-        fallthrough
-    case TypeInt:
-        index = m.Class.PushInt32Constant(Integer, object.(int))
-        m.AddInsn(Ldc, byte(index))
-        break
-    case TypeFloat:
-        index = m.Class.PushFloat32Constant(Float, object.(float32))
-        m.AddInsn(Ldc, byte(index))
-        break
-    case TypeDouble:
-        index = m.Class.PushFloat64Constant(Double, object.(float64))
-        m.AddInsn(Ldc2w, byte(index))
-        break
-    case TypeLong:
-        index = m.Class.PushInt64Constant(Long, object.(int64))
-        m.AddInsn(Ldc2w, byte(index))
-        break
-    case TypeString:
-        index = m.Class.PushStringConstant(object.(string))
-        m.AddInsn(Ldc, byte(index))
-        break
-    }
+func (m *MethodVisitor) AddLdcInsn(insn Instruction, object interface{}) {
+    index := m.Class.PushTypeConstant(object)
+    m.AddInsn(insn, byte(index))
 }
 
 func (m *MethodVisitor) AddVarInsn(insn Instruction, value ...uint16) {
