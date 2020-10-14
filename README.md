@@ -49,6 +49,7 @@ func main() {
         "java/lang/Object", "<init>", "()V")
     init.AddInsn(bytecode.Return)
 
+    // This also requires the Cloneable.clone method to be generated!
     clone := visitor.NewMethod(bytecode.AccPublic, "clone", "()Lmy/package/HelloWorld;")
     clone.AddTypeInsn(bytecode.New, "my/package/HelloWorld")
     clone.AddInsn(bytecode.Dup)

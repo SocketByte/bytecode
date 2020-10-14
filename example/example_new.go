@@ -8,6 +8,8 @@ import (
 )
 
 func main() {
+    fmt.Println(bytecode.Int64ToBinary(46346346346))
+
     // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
         "my/package/HelloWorld", "java/lang/Object", []string{"java/lang/Cloneable"},
