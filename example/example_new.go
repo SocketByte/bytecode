@@ -10,7 +10,7 @@ import (
 func main() {
     // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
-        "HelloWorld", "java/lang/Object", []string{"java/lang/Integer"},
+        "my/package/HelloWorld", "java/lang/Object", []string{"java/lang/Cloneable"},
         bytecode.AccPublic|bytecode.AccSuper)
 
     // Add source file attribute
@@ -29,6 +29,13 @@ func main() {
         "java/lang/Object", "<init>", "()V")
     init.AddInsn(bytecode.Return)
 
+    clone := visitor.NewMethod(bytecode.AccPublic, "clone", "()Lmy/package/HelloWorld;")
+    clone.AddTypeInsn(bytecode.New, "my/package/HelloWorld")
+    clone.AddInsn(bytecode.Dup)
+    clone.AddMethodInsn(bytecode.Invokespecial,
+        "my/package/HelloWorld", "<init>", "()V")
+    clone.AddInsn(bytecode.Areturn)
+
     // Create main method
     main := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
         "main", "([Ljava/lang/String;)V")
@@ -46,7 +53,7 @@ func main() {
     main.AddJumpInsn(bytecode.Ificmpge, label)
     // System.out.println("Hello, World!");
     main.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
-    main.AddLdcInsn(bytecode.Ldc, "Hello, World!")
+    main.AddLdcInsn("Hello, World!")
     main.AddMethodInsn(bytecode.Invokevirtual,
         "java/io/PrintStream", "println", "(Ljava/lang/String;)V")
     // Add return to the method

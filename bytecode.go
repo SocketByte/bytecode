@@ -191,7 +191,7 @@ func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
     base16 := fmt.Sprintf("%x", constant)
     position, ok := v.ConstantPoolCache[base16]
     if ok {
-        return position
+       return position
     }
 
     data := Constant{
@@ -208,36 +208,36 @@ func (v *ClassVisitor) PushConstant(tag byte, constant ...byte) uint16 {
     return index
 }
 
-func (v *ClassVisitor) PushTypeConstant(constant interface{}) uint16 {
+func (v *ClassVisitor) PushTypeConstant(constant interface{}) (uint16, bool) {
     switch value := constant.(type) {
     case int8:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case int16:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case int:
-        return v.PushInt32Constant(Integer, value)
+        return v.PushInt32Constant(Integer, value), false
     case int32:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case int64:
-        return v.PushInt64Constant(Long, value)
+        return v.PushInt64Constant(Long, value), true
     case uint8:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case uint16:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case uint:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case uint32:
-        return v.PushInt32Constant(Integer, int(value))
+        return v.PushInt32Constant(Integer, int(value)), false
     case uint64:
-        return v.PushInt64Constant(Long, int64(value))
+        return v.PushInt64Constant(Long, int64(value)), true
     case float32:
-        return v.PushFloat32Constant(Float, value)
+        return v.PushFloat32Constant(Float, value), false
     case float64:
-        return v.PushFloat64Constant(Double, value)
+        return v.PushFloat64Constant(Double, value), true
     case string:
-        return v.PushStringConstant(value)
+        return v.PushStringConstant(value), false
     }
-    return 0xff // invalid type
+    return 0xff, false // invalid type
 }
 
 func (v *ClassVisitor) AddSourceFile(sourceFile string) {
@@ -355,7 +355,7 @@ func (f *FieldVisitor) AsBytecode() []byte {
     buffer.PushUInt16(namePosition, descriptorPosition)
 
     if f.AccessFlags&AccFinal == AccFinal && f.Constant != nil {
-        constantValuePosition := f.Class.PushTypeConstant(f.Constant)
+        constantValuePosition, _ := f.Class.PushTypeConstant(f.Constant)
         if constantValuePosition == 0xff {
             log.Fatal(fmt.Errorf("field constant value of %s at %s is incorrect",
                 reflect.TypeOf(f.Constant), f.Name))
@@ -394,9 +394,18 @@ type MethodVisitor struct {
     CurrentByte uint16
 }
 
-func (m *MethodVisitor) AddLdcInsn(insn Instruction, object interface{}) {
-    index := m.Class.PushTypeConstant(object)
-    m.AddInsn(insn, byte(index))
+func (m *MethodVisitor) AddTypeInsn(insn Instruction, typeName string) {
+    index := m.Class.PushClassConstant(typeName)
+    m.AddInsn(insn, Int16ToBinary(index)...)
+}
+
+func (m *MethodVisitor) AddLdcInsn(object interface{}) {
+    index, wide := m.Class.PushTypeConstant(object)
+    if wide {
+        m.AddInsn(Ldc2w, Int16ToBinary(index)...)
+        return
+    }
+    m.AddInsn(Ldc, byte(index))
 }
 
 func (m *MethodVisitor) AddVarInsn(insn Instruction, value ...uint16) {

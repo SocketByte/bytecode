@@ -30,7 +30,7 @@ import (
 func main() {
     // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
-        "HelloWorld", "java/lang/Object", []string{"java/lang/Integer"},
+        "my/package/HelloWorld", "java/lang/Object", []string{"java/lang/Cloneable"},
         bytecode.AccPublic|bytecode.AccSuper)
 
     // Add source file attribute
@@ -49,6 +49,13 @@ func main() {
         "java/lang/Object", "<init>", "()V")
     init.AddInsn(bytecode.Return)
 
+    clone := visitor.NewMethod(bytecode.AccPublic, "clone", "()Lmy/package/HelloWorld;")
+    clone.AddTypeInsn(bytecode.New, "my/package/HelloWorld")
+    clone.AddInsn(bytecode.Dup)
+    clone.AddMethodInsn(bytecode.Invokespecial,
+        "my/package/HelloWorld", "<init>", "()V")
+    clone.AddInsn(bytecode.Areturn)
+
     // Create main method
     main := visitor.NewMethod(bytecode.AccPublic|bytecode.AccStatic|bytecode.AccVarargs,
         "main", "([Ljava/lang/String;)V")
@@ -66,7 +73,7 @@ func main() {
     main.AddJumpInsn(bytecode.Ificmpge, label)
     // System.out.println("Hello, World!");
     main.AddFieldInsn(bytecode.Getstatic, "java/lang/System", "out", "Ljava/io/PrintStream;")
-    main.AddLdcInsn(bytecode.Ldc, "Hello, World!")
+    main.AddLdcInsn("Hello, World!")
     main.AddMethodInsn(bytecode.Invokevirtual,
         "java/io/PrintStream", "println", "(Ljava/lang/String;)V")
     // Add return to the method
@@ -79,13 +86,13 @@ func main() {
 
 ```
 ```
-public class HelloWorld implements java.lang.Integer
+public class my.package.HelloWorld implements java.lang.Cloneable
   minor version: 0
   major version: 49
   flags: (0x0021) ACC_PUBLIC, ACC_SUPER
-  this_class: #24                         // HelloWorld
+  this_class: #10                         // my/package/HelloWorld
   super_class: #4                         // java/lang/Object
-  interfaces: 1, fields: 2, methods: 2, attributes: 1
+  interfaces: 1, fields: 2, methods: 3, attributes: 1
 Constant pool:
    #1 = Utf8               SourceFile
    #2 = Utf8               HelloWorld.java
@@ -95,33 +102,36 @@ Constant pool:
    #6 = Utf8               ()V
    #7 = NameAndType        #5:#6          // "<init>":()V
    #8 = Methodref          #4.#7          // java/lang/Object."<init>":()V
-   #9 = Utf8               java/lang/System
-  #10 = Class              #9             // java/lang/System
-  #11 = Utf8               out
-  #12 = Utf8               Ljava/io/PrintStream;
-  #13 = NameAndType        #11:#12        // out:Ljava/io/PrintStream;
-  #14 = Fieldref           #10.#13        // java/lang/System.out:Ljava/io/PrintStream;
-  #15 = Utf8               Hello, World!
-  #16 = String             #15            // Hello, World!
-  #17 = Utf8               java/io/PrintStream
-  #18 = Class              #17            // java/io/PrintStream
-  #19 = Utf8               println
-  #20 = Utf8               (Ljava/lang/String;)V
-  #21 = NameAndType        #19:#20        // println:(Ljava/lang/String;)V
-  #22 = Methodref          #18.#21        // java/io/PrintStream.println:(Ljava/lang/String;)V
-  #23 = Utf8               HelloWorld
-  #24 = Class              #23            // HelloWorld
-  #25 = Utf8               java/lang/Integer
-  #26 = Class              #25            // java/lang/Integer
-  #27 = Utf8               Code
-  #28 = Utf8               main
-  #29 = Utf8               ([Ljava/lang/String;)V
-  #30 = Utf8               globalValue
-  #31 = Utf8               I
-  #32 = Integer            43
-  #33 = Utf8               ConstantValue
-  #34 = Utf8               globalString
-  #35 = Utf8               Ljava/lang/String;
+   #9 = Utf8               my/package/HelloWorld
+  #10 = Class              #9             // my/package/HelloWorld
+  #11 = Methodref          #10.#7         // my/package/HelloWorld."<init>":()V
+  #12 = Utf8               java/lang/System
+  #13 = Class              #12            // java/lang/System
+  #14 = Utf8               out
+  #15 = Utf8               Ljava/io/PrintStream;
+  #16 = NameAndType        #14:#15        // out:Ljava/io/PrintStream;
+  #17 = Fieldref           #13.#16        // java/lang/System.out:Ljava/io/PrintStream;
+  #18 = Utf8               Hello, World!
+  #19 = String             #18            // Hello, World!
+  #20 = Utf8               java/io/PrintStream
+  #21 = Class              #20            // java/io/PrintStream
+  #22 = Utf8               println
+  #23 = Utf8               (Ljava/lang/String;)V
+  #24 = NameAndType        #22:#23        // println:(Ljava/lang/String;)V
+  #25 = Methodref          #21.#24        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #26 = Utf8               java/lang/Cloneable
+  #27 = Class              #26            // java/lang/Cloneable
+  #28 = Utf8               Code
+  #29 = Utf8               clone
+  #30 = Utf8               ()Lmy/package/HelloWorld;
+  #31 = Utf8               main
+  #32 = Utf8               ([Ljava/lang/String;)V
+  #33 = Utf8               globalValue
+  #34 = Utf8               I
+  #35 = Integer            43
+  #36 = Utf8               ConstantValue
+  #37 = Utf8               globalString
+  #38 = Utf8               Ljava/lang/String;
 {
   public final int globalValue;
     descriptor: I
@@ -132,7 +142,7 @@ Constant pool:
     descriptor: Ljava/lang/String;
     flags: (0x0001) ACC_PUBLIC
 
-  public HelloWorld();
+  public my.package.HelloWorld();
     descriptor: ()V
     flags: (0x0001) ACC_PUBLIC
     Code:
@@ -140,6 +150,16 @@ Constant pool:
          0: aload_0
          1: invokespecial #8                  // Method java/lang/Object."<init>":()V
          4: return
+
+  public my.package.HelloWorld clone();
+    descriptor: ()Lmy/package/HelloWorld;
+    flags: (0x0001) ACC_PUBLIC
+    Code:
+      stack=2, locals=1, args_size=1
+         0: new           #10                 // class my/package/HelloWorld
+         3: dup
+         4: invokespecial #11                 // Method "<init>":()V
+         7: areturn
 
   public static void main(java.lang.String...);
     descriptor: ([Ljava/lang/String;)V
@@ -151,9 +171,9 @@ Constant pool:
          3: iload_1
          4: iconst_2
          5: if_icmpge     16
-         8: getstatic     #14                 // Field java/lang/System.out:Ljava/io/PrintStream;
-        11: ldc           #16                 // String Hello, World!
-        13: invokevirtual #22                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+         8: getstatic     #17                 // Field java/lang/System.out:Ljava/io/PrintStream;
+        11: ldc           #19                 // String Hello, World!
+        13: invokevirtual #25                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
         16: return
 }
 SourceFile: "HelloWorld.java"
