@@ -65,6 +65,7 @@ type ClassVisitor struct {
     ConstantPoolCache map[string]uint16
 
     InterfaceLength uint16
+    Interfaces      []string
     FieldLength     uint16
     Fields          []*FieldVisitor
     MethodLength    uint16
@@ -73,7 +74,7 @@ type ClassVisitor struct {
     Attributes      [][]byte
 }
 
-func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) *ClassVisitor {
+func NewClass(majorVersion uint16, name, superClass string, interfaces []string, accessFlags uint16) *ClassVisitor {
     visitor := ClassVisitor{
         MinorVersion:   0,
         MajorVersion:   majorVersion,
@@ -81,10 +82,13 @@ func NewClass(majorVersion uint16, name, superClass string, accessFlags uint16) 
         Name:           name,
         SuperClassName: superClass,
 
+        Interfaces: interfaces,
         ConstantPoolSize:  1,
         ConstantPoolCache: make(map[string]uint16),
     }
-
+    if interfaces != nil {
+        visitor.InterfaceLength = uint16(len(interfaces))
+    }
     return &visitor
 }
 
@@ -253,6 +257,11 @@ func (v *ClassVisitor) AsBytecode() []byte {
     classPosition := v.PushClassConstant(v.Name)
     superClassPosition := v.PushClassConstant(v.SuperClassName)
 
+    var interfaces []uint16
+    for _, interfaceName := range v.Interfaces {
+        interfaces = append(interfaces, v.PushClassConstant(interfaceName))
+    }
+
     var methods [][]byte
     for _, method := range v.Methods {
         methods = append(methods, method.AsBytecode())
@@ -279,6 +288,9 @@ func (v *ClassVisitor) AsBytecode() []byte {
     buffer.PushUInt16(superClassPosition)
 
     buffer.PushUInt16(v.InterfaceLength)
+    if v.InterfaceLength > 0 {
+        buffer.PushUInt16(interfaces...)
+    }
     buffer.PushUInt16(v.FieldLength)
     for _, bytes := range fields {
         buffer.PushBytes(bytes...)

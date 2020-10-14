@@ -10,7 +10,7 @@ import (
 func main() {
     // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
-        "HelloWorld", "java/lang/Object",
+        "HelloWorld", "java/lang/Object", []string{"java/lang/Integer"},
         bytecode.AccPublic|bytecode.AccSuper)
 
     // Add source file attribute

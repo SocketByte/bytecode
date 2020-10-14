@@ -15,7 +15,6 @@ Very simple bytecode generation library for Go
 - Annotation support
 - `LineNumberTable` support
 - Exception support (`throws`)
-- Interface support
 - Inner classes
 - Stack frames
 
@@ -31,7 +30,7 @@ import (
 func main() {
     // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
-        "HelloWorld", "java/lang/Object",
+        "HelloWorld", "java/lang/Object", []string{"java/lang/Integer"},
         bytecode.AccPublic|bytecode.AccSuper)
 
     // Add source file attribute
@@ -80,13 +79,13 @@ func main() {
 
 ```
 ```
-public class HelloWorld
+public class HelloWorld implements java.lang.Integer
   minor version: 0
   major version: 49
   flags: (0x0021) ACC_PUBLIC, ACC_SUPER
   this_class: #24                         // HelloWorld
   super_class: #4                         // java/lang/Object
-  interfaces: 0, fields: 2, methods: 2, attributes: 1
+  interfaces: 1, fields: 2, methods: 2, attributes: 1
 Constant pool:
    #1 = Utf8               SourceFile
    #2 = Utf8               HelloWorld.java
@@ -112,15 +111,17 @@ Constant pool:
   #22 = Methodref          #18.#21        // java/io/PrintStream.println:(Ljava/lang/String;)V
   #23 = Utf8               HelloWorld
   #24 = Class              #23            // HelloWorld
-  #25 = Utf8               Code
-  #26 = Utf8               main
-  #27 = Utf8               ([Ljava/lang/String;)V
-  #28 = Utf8               globalValue
-  #29 = Utf8               I
-  #30 = Integer            43
-  #31 = Utf8               ConstantValue
-  #32 = Utf8               globalString
-  #33 = Utf8               Ljava/lang/String;
+  #25 = Utf8               java/lang/Integer
+  #26 = Class              #25            // java/lang/Integer
+  #27 = Utf8               Code
+  #28 = Utf8               main
+  #29 = Utf8               ([Ljava/lang/String;)V
+  #30 = Utf8               globalValue
+  #31 = Utf8               I
+  #32 = Integer            43
+  #33 = Utf8               ConstantValue
+  #34 = Utf8               globalString
+  #35 = Utf8               Ljava/lang/String;
 {
   public final int globalValue;
     descriptor: I
