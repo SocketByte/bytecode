@@ -30,7 +30,7 @@ func main() {
 	// Push -3 as byte value
 	main.AddInt8Insn(bytecode.Bipush, -3)
 	// Store at 1
-	main.AddInsn(bytecode.Istore1)
+	main.AddVarInsn(bytecode.Istore1)
 	// Load 1
 	main.AddInsn(bytecode.Iload1)
 	// Push 2 as int value

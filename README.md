@@ -43,7 +43,7 @@ func main() {
     // Push -3 as byte value
     main.AddInt8Insn(bytecode.Bipush, -3)
     // Store at 1
-    main.AddInsn(bytecode.Istore1)
+    main.AddVarInsn(bytecode.Istore1)
     // Load 1
     main.AddInsn(bytecode.Iload1)
     // Push 2 as int value
@@ -127,7 +127,7 @@ Constant pool:
     descriptor: ([Ljava/lang/String;)V
     flags: (0x0089) ACC_PUBLIC, ACC_STATIC, ACC_VARARGS
     Code:
-      stack=2, locals=1, args_size=1
+      stack=2, locals=2, args_size=1
          0: bipush        -3
          2: istore_1
          3: iload_1
