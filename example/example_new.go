@@ -8,9 +8,6 @@ import (
 )
 
 func main() {
-    fmt.Println(bytecode.Int64ToBinary(46346346346))
-
-    // Create new Java class
     visitor := bytecode.NewClass(bytecode.Java5,
         "my/package/HelloWorld", "java/lang/Object", []string{"java/lang/Cloneable"},
         bytecode.AccPublic|bytecode.AccSuper)
@@ -31,6 +28,7 @@ func main() {
         "java/lang/Object", "<init>", "()V")
     init.AddInsn(bytecode.Return)
 
+    // This also requires the Cloneable.clone method to be generated!
     clone := visitor.NewMethod(bytecode.AccPublic, "clone", "()Lmy/package/HelloWorld;")
     clone.AddTypeInsn(bytecode.New, "my/package/HelloWorld")
     clone.AddInsn(bytecode.Dup)
@@ -62,6 +60,8 @@ func main() {
     main.AddInsn(bytecode.Return)
     // Set label to point to "return" instruction (jump to return)
     main.AddLabel(label)
+
+    fmt.Println(visitor.AsBytecode())
 
     RunJavap(visitor.AsBytecode(), "build/HelloWorld.class")
 }
